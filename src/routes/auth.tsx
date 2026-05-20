@@ -11,6 +11,7 @@ function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
 
   useEffect(() => {
     getSessionFn().then((data) => {
@@ -18,27 +19,34 @@ function AuthPage() {
     });
   }, [navigate]);
 
-  const signInEmail = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !password) return toast.error("Please fill in all fields.");
-    
+    if (!email || !password) return toast.error("Veuillez remplir tous les champs.");
+    if (password.length < 8) return toast.error("Le mot de passe doit faire au moins 8 caractères.");
+
     setLoading(true);
     try {
-      await signUpWithEmailFn({ data: { email, password } });
+      const result = await signUpWithEmailFn({ data: { email, password } });
+      if (result.isNew) {
+        toast.success("Compte créé avec succès ! Bienvenue 🎉");
+      } else {
+        toast.success("Connexion réussie !");
+      }
       navigate({ to: "/dashboard" });
     } catch (err: any) {
-      toast.error("Auth failed", { description: err.message });
+      toast.error(err.message || "Une erreur est survenue.");
     } finally {
       setLoading(false);
     }
   };
 
   const signInGoogle = () => {
-    toast.info("Google Auth is coming soon! Please use Email for now.");
+    toast.info("Google Auth arrive bientôt ! Utilisez l'email pour l'instant.");
   };
 
   return (
     <div className="grid min-h-screen md:grid-cols-2">
+      {/* Left panel */}
       <div className="hidden flex-col justify-between bg-stone-950 p-12 text-stone-100 md:flex">
         <Link to="/"><Logo /></Link>
         <div>
@@ -48,60 +56,106 @@ function AuthPage() {
         <div className="text-xs text-stone-500">© {new Date().getFullYear()} Verba</div>
       </div>
 
+      {/* Right panel */}
       <div className="flex items-center justify-center bg-background p-8">
         <div className="w-full max-w-sm">
           <div className="md:hidden mb-8"><Link to="/"><Logo /></Link></div>
-          <h1 className="font-display text-3xl">Welcome to Verba</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Sign in to start translating live in 80+ languages.</p>
 
-          <form onSubmit={signInEmail} className="mt-8 space-y-4">
+          <h1 className="font-display text-3xl">
+            {mode === "signin" ? "Bon retour !" : "Créer un compte"}
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {mode === "signin"
+              ? "Connectez-vous pour diffuser en temps réel."
+              : "Rejoignez Verba et traduisez en 80+ langues."}
+          </p>
+
+          {/* Mode tabs */}
+          <div className="mt-6 flex rounded-lg border border-border bg-muted p-1">
+            <button
+              type="button"
+              onClick={() => setMode("signin")}
+              className={`flex-1 rounded-md py-1.5 text-sm font-medium transition ${mode === "signin" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              Se connecter
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("signup")}
+              className={`flex-1 rounded-md py-1.5 text-sm font-medium transition ${mode === "signup" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              Créer un compte
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <div>
               <label className="mb-1 block text-sm font-medium">Email</label>
-              <input 
-                type="email" 
+              <input
+                type="email"
+                id="auth-email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                placeholder="you@example.com"
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                placeholder="vous@exemple.com"
                 required
+                autoComplete="email"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium">Password</label>
-              <input 
-                type="password" 
+              <label className="mb-1 block text-sm font-medium">Mot de passe</label>
+              <input
+                type="password"
+                id="auth-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
                 placeholder="••••••••"
                 required
+                minLength={8}
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
               />
+              {mode === "signup" && (
+                <p className="mt-1 text-xs text-muted-foreground">Minimum 8 caractères</p>
+              )}
             </div>
             <button
+              id="auth-submit"
               type="submit"
               disabled={loading}
-              className="flex w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-60"
+              className="flex w-full items-center justify-center rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition hover:bg-primary/90 disabled:opacity-60"
             >
-              {loading ? "Signing in..." : "Continue with Email"}
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  {mode === "signin" ? "Connexion..." : "Création..."}
+                </span>
+              ) : (
+                mode === "signin" ? "Se connecter" : "Créer mon compte"
+              )}
             </button>
           </form>
 
           <div className="my-6 flex items-center gap-4 before:h-px before:flex-1 before:bg-border after:h-px after:flex-1 after:bg-border">
-            <span className="text-xs text-muted-foreground">OR</span>
+            <span className="text-xs text-muted-foreground">OU</span>
           </div>
 
           <button
+            id="auth-google"
             type="button"
             onClick={signInGoogle}
             disabled={loading}
             className="flex w-full items-center justify-center gap-3 rounded-md border border-border bg-card px-4 py-3 text-sm font-medium shadow-sm transition hover:bg-accent disabled:opacity-60"
           >
             <GoogleIcon />
-            Continue with Google
+            Continuer avec Google
           </button>
 
           <p className="mt-8 text-center text-xs text-muted-foreground">
-            By continuing, you agree to our <Link to="/terms" className="underline">Terms</Link> and <Link to="/privacy" className="underline">Privacy Policy</Link>.
+            En continuant, vous acceptez nos <Link to="/" className="underline">CGU</Link> et notre <Link to="/" className="underline">Politique de confidentialité</Link>.
           </p>
         </div>
       </div>

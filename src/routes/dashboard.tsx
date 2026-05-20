@@ -72,7 +72,7 @@ function Dashboard() {
 
         <div className="mt-10 grid gap-6 md:grid-cols-2">
           <ActionCard to="/translate" icon={<Mic className="h-5 w-5" />} title="New live session" desc="Translate your voice in real time to 80+ languages." cta="Start session" />
-          <ActionCard to="/translate" search={{ faith: "1" }} icon={<Sparkles className="h-5 w-5" />} title="Faith Mode" desc="Dedicated mode for khutbahs and Shia religious content." cta="Open Faith Mode" accent />
+          <ActionCard to="/translate" icon={<Sparkles className="h-5 w-5" />} title="Faith Mode" desc="Dedicated mode for khutbahs and Shia religious content." cta="Open Faith Mode" accent />
         </div>
 
         <div className="mt-12">
@@ -84,20 +84,18 @@ function Dashboard() {
           ) : (
             <ul className="mt-4 divide-y divide-border rounded-xl border border-border bg-card">
               {sessions.map((s) => (
-                <li key={s.id}>
-                  <Link to="/sessions/$id" params={{ id: s.id }} className="flex items-center justify-between gap-4 px-5 py-4 hover:bg-accent">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate font-medium">{s.title}</span>
-                        {s.is_live && <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-1.5 py-0.5 text-[10px] text-red-600"><Radio className="h-2.5 w-2.5 animate-pulse" /> Live</span>}
-                        {s.mode === "faith" && <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-700">Faith</span>}
-                      </div>
-                      <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                        {new Date(s.started_at).toLocaleString()} · {s.source_lang} → {s.target_langs.join(", ")}
-                      </div>
+                <li key={s.id} className="flex items-center justify-between gap-4 px-5 py-4">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate font-medium">{s.title || "Session sans titre"}</span>
+                      {s.is_live && <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-1.5 py-0.5 text-[10px] text-red-600"><Radio className="h-2.5 w-2.5 animate-pulse" /> Live</span>}
+                      {s.mode === "faith" && <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-700">Faith</span>}
                     </div>
-                    <ChevronRight className="h-4 w-4 flex-none text-muted-foreground" />
-                  </Link>
+                    <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {new Date(s.started_at).toLocaleString()} · {s.source_lang} → {s.target_langs.join(", ")}
+                    </div>
+                  </div>
+                  <ChevronRight className="h-4 w-4 flex-none text-muted-foreground" />
                 </li>
               ))}
             </ul>
@@ -108,13 +106,13 @@ function Dashboard() {
   );
 }
 
-function ActionCard({ to, search, icon, title, desc, cta, accent = false }: { to: string; search?: Record<string, string>; icon: React.ReactNode; title: string; desc: string; cta: string; accent?: boolean }) {
+function ActionCard({ to, icon, title, desc, cta, accent = false }: { to: string; icon: React.ReactNode; title: string; desc: string; cta: string; accent?: boolean }) {
   return (
     <div className={`rounded-2xl border p-6 ${accent ? "border-primary/40 bg-primary/[0.04]" : "border-border bg-card"}`}>
       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">{icon}</div>
       <h3 className="mt-4 font-display text-xl">{title}</h3>
       <p className="mt-2 text-sm text-muted-foreground">{desc}</p>
-      <Link to={to} search={search as any} className={`mt-6 inline-block rounded-md px-4 py-2 text-sm font-medium ${accent ? "bg-primary text-primary-foreground hover:bg-primary/90" : "border border-border hover:bg-accent"}`}>
+      <Link to={to} className={`mt-6 inline-block rounded-md px-4 py-2 text-sm font-medium ${accent ? "bg-primary text-primary-foreground hover:bg-primary/90" : "border border-border hover:bg-accent"}`}>
         {cta}
       </Link>
     </div>
