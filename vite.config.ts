@@ -13,6 +13,12 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
+    preview: {
+      allowedHosts: true,
+    },
+    server: {
+      allowedHosts: true,
+    },
     build: {
       rollupOptions: {
         external: ["vinxi/http"],
