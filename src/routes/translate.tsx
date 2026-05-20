@@ -1,7 +1,7 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-start";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useRef } from "react";
-import { getSessionFn } from "@/server/auth";
-import { addTranscriptFn } from "@/server/live";
+import { getSessionFn } from "@/api/auth";
+import { addTranscriptFn } from "@/api/live";
 import { Logo } from "@/components/Logo";
 import { Mic, MicOff, Settings, Radio } from "lucide-react";
 import { toast } from "sonner";

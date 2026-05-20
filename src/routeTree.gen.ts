@@ -14,7 +14,6 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LiveShareCodeRouteImport } from './routes/live.$shareCode'
-import { Route as ApiStreamRouteImport } from './routes/api/stream'
 
 const TranslateRoute = TranslateRouteImport.update({
   id: '/translate',
@@ -41,18 +40,12 @@ const LiveShareCodeRoute = LiveShareCodeRouteImport.update({
   path: '/live/$shareCode',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiStreamRoute = ApiStreamRouteImport.update({
-  id: '/api/stream',
-  path: '/api/stream',
-  getParentRoute: () => rootRouteImport,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRoute
   '/translate': typeof TranslateRoute
-  '/api/stream': typeof ApiStreamRoute
   '/live/$shareCode': typeof LiveShareCodeRoute
 }
 export interface FileRoutesByTo {
@@ -60,7 +53,6 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRoute
   '/translate': typeof TranslateRoute
-  '/api/stream': typeof ApiStreamRoute
   '/live/$shareCode': typeof LiveShareCodeRoute
 }
 export interface FileRoutesById {
@@ -69,33 +61,19 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/dashboard': typeof DashboardRoute
   '/translate': typeof TranslateRoute
-  '/api/stream': typeof ApiStreamRoute
   '/live/$shareCode': typeof LiveShareCodeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/auth'
-    | '/dashboard'
-    | '/translate'
-    | '/api/stream'
-    | '/live/$shareCode'
+  fullPaths: '/' | '/auth' | '/dashboard' | '/translate' | '/live/$shareCode'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/auth'
-    | '/dashboard'
-    | '/translate'
-    | '/api/stream'
-    | '/live/$shareCode'
+  to: '/' | '/auth' | '/dashboard' | '/translate' | '/live/$shareCode'
   id:
     | '__root__'
     | '/'
     | '/auth'
     | '/dashboard'
     | '/translate'
-    | '/api/stream'
     | '/live/$shareCode'
   fileRoutesById: FileRoutesById
 }
@@ -104,7 +82,6 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   DashboardRoute: typeof DashboardRoute
   TranslateRoute: typeof TranslateRoute
-  ApiStreamRoute: typeof ApiStreamRoute
   LiveShareCodeRoute: typeof LiveShareCodeRoute
 }
 
@@ -145,13 +122,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LiveShareCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/stream': {
-      id: '/api/stream'
-      path: '/api/stream'
-      fullPath: '/api/stream'
-      preLoaderRoute: typeof ApiStreamRouteImport
-      parentRoute: typeof rootRouteImport
-    }
   }
 }
 
@@ -160,7 +130,6 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   DashboardRoute: DashboardRoute,
   TranslateRoute: TranslateRoute,
-  ApiStreamRoute: ApiStreamRoute,
   LiveShareCodeRoute: LiveShareCodeRoute,
 }
 export const routeTree = rootRouteImport

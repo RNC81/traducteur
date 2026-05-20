@@ -1,7 +1,7 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-start";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { getSessionFn, signOutFn } from "@/server/auth";
-import { getSessionsFn } from "@/server/sessions";
+import { getSessionFn, signOutFn } from "@/api/auth";
+import { getSessionsFn } from "@/api/sessions";
 import { Logo } from "@/components/Logo";
 import { LogOut, Mic, Sparkles, Radio, ChevronRight } from "lucide-react";
 

@@ -4,7 +4,7 @@ import Transcript from "../lib/models/Transcript";
 import Session from "../lib/models/Session";
 import { clients } from "./liveStore";
 
-export const addTranscriptFn = createServerFn("POST", async (data: { share_code: string; original_text: string; translations: Record<string, string> }) => {
+export const addTranscriptFn = createServerFn({ method: "POST" }).handler(async ({ data }: { data: { share_code: string; original_text: string; translations: Record<string, string> } }) => {
   await connectToDatabase();
   
   const session = await Session.findOne({ share_code: data.share_code });

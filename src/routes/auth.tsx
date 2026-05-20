@@ -1,8 +1,8 @@
-import { createFileRoute, useNavigate, Link } from "@tanstack/react-start";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/Logo";
 import { toast } from "sonner";
-import { getSessionFn, signUpWithEmailFn } from "@/server/auth";
+import { getSessionFn, signUpWithEmailFn } from "@/api/auth";
 
 export const Route = createFileRoute("/auth")({ component: AuthPage });
 

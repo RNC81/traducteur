@@ -3,7 +3,7 @@ import connectToDatabase from "../lib/db";
 import Session from "../lib/models/Session";
 import { getUserFromToken } from "./auth";
 
-export const getSessionsFn = createServerFn("GET", async () => {
+export const getSessionsFn = createServerFn({ method: "GET" }).handler(async () => {
   const user = await getUserFromToken();
   if (!user) {
     throw new Error("Unauthorized");
