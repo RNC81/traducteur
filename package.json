@@ -83,6 +83,7 @@
   "private": true,
   "scripts": {
     "build": "vite build",
+    "postbuild": "node -e \"const fs=require('fs'); if(fs.existsSync('dist/server/index.js')) fs.copyFileSync('dist/server/index.js', 'dist/server/server.js')\"",
     "build:dev": "vite build --mode development",
     "dev": "vite dev",
     "format": "prettier --write .",
