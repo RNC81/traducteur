@@ -193,6 +193,9 @@ function TranslatePage() {
                   <option value="fr-FR">Français</option>
                   <option value="en-US">Anglais</option>
                   <option value="ar-SA">Arabe</option>
+                  <option value="fa-IR">Farsi / Perse</option>
+                  <option value="ur-PK">Ourdou (Urdu)</option>
+                  <option value="hi-IN">Hindi</option>
                 </select>
               </div>
 

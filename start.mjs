@@ -243,7 +243,7 @@ async function handleAddInterimTranscript(req, res) {
   const session = await Session.findOne({ share_code });
   if (!session) return json(res, 404, { error: "Session introuvable." });
   
-  const targetLangs = session.target_langs || ["FR", "AR"];
+  const targetLangs = session.target_langs || ["FR", "AR", "EN", "FA", "UR", "HI"];
   
   // Use google-translate-api-x for fast free unlimited word-by-word
   let translations = {};
@@ -286,7 +286,7 @@ async function handleAddTranscript(req, res) {
   if (session.owner.toString() !== payload.userId) return json(res, 403, { error: "Non autorisé." });
 
   // 1. FAST DRAFT (using Google Translate for instantaneous zero-flicker rendering)
-  const targetLangs = session.target_langs || ["FR", "AR", "EN"];
+  const targetLangs = session.target_langs || ["FR", "AR", "EN", "FA", "UR", "HI"];
   const draftTranslations = {};
   
   try {
@@ -473,7 +473,7 @@ async function handleCreateSession(req, res) {
   const payload = getUserFromCookie(req);
   if (!payload) return json(res, 401, { error: "Non authentifié." });
 
-  const { title, source_lang = "fr-FR", target_langs = ["FR", "AR", "EN"], mode = "live", context = "" } = await readBody(req);
+  const { title, source_lang = "fr-FR", target_langs = ["FR", "AR", "EN", "FA", "UR", "HI"], mode = "live", context = "" } = await readBody(req);
 
   // Generate a unique share_code
   const share_code = Math.random().toString(36).substring(2, 10).toUpperCase();

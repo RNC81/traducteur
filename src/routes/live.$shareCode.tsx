@@ -105,8 +105,11 @@ function LivePage() {
           >
             {[
               { code: "FR", label: "Français", match: "fr" },
+              { code: "EN", label: "English", match: "en" },
               { code: "AR", label: "العربية", match: "ar" },
-              { code: "EN", label: "English", match: "en" }
+              { code: "FA", label: "Farsi / فارسی", match: "fa" },
+              { code: "UR", label: "Urdu / اردو", match: "ur" },
+              { code: "HI", label: "Hindi / हिन्दी", match: "hi" }
             ].map(lang => {
               const isOriginal = sourceLang.toLowerCase().startsWith(lang.match);
               return (
