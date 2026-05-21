@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useRef } from "react";
 import { Logo } from "@/components/Logo";
-import { Mic, MicOff, Settings, Radio } from "lucide-react";
+import { Mic, MicOff, Settings, Radio, MonitorPlay } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/translate")({ component: TranslatePage });
@@ -26,6 +26,13 @@ function TranslatePage() {
       .then(({ user }) => { if (!user) navigate({ to: "/auth" }); })
       .catch(() => navigate({ to: "/auth" }));
   }, [navigate]);
+
+  const copyOBSLink = () => {
+    if (!shareCode) return;
+    const url = `${window.location.origin}/overlay/${shareCode}?lang=FR`;
+    navigator.clipboard.writeText(url);
+    toast.success("Lien Régie (OBS) copié !");
+  };
 
   const toggleLive = async () => {
     if (isLive) {
@@ -156,6 +163,13 @@ function TranslatePage() {
               >
                 /live/{shareCode}
               </a>
+              <button 
+                onClick={copyOBSLink}
+                className="ml-2 rounded-md bg-emerald-500/10 p-1.5 text-emerald-500 hover:bg-emerald-500/20 transition-colors"
+                title="Copier le lien Régie (OBS)"
+              >
+                <MonitorPlay className="h-4 w-4" />
+              </button>
             </div>
           )}
           <button className="rounded-md border border-border p-2 hover:bg-accent">
