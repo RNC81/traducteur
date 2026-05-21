@@ -219,7 +219,7 @@ async function handleAddTranscript(req, res) {
 
   await connectDB();
   const session = await Session.findOne({ share_code });
-  if (!session) return json(res, 404, { error: "Session introuvable." });
+  if (!session) return json(res, 404, { error: "Session introuvable. Créez d'abord une session." });
   if (session.owner.toString() !== payload.userId) return json(res, 403, { error: "Non autorisé." });
 
   const transcript = await Transcript.create({
@@ -241,6 +241,35 @@ async function handleAddTranscript(req, res) {
   }
 
   return json(res, 200, { success: true });
+}
+
+/** POST /api/sessions — create a new live session */
+async function handleCreateSession(req, res) {
+  const payload = getUserFromCookie(req);
+  if (!payload) return json(res, 401, { error: "Non authentifié." });
+
+  const { title, source_lang = "fr-FR", target_langs = ["FR", "AR"], mode = "live" } = await readBody(req);
+
+  // Generate a unique share_code
+  const share_code = Math.random().toString(36).substring(2, 10).toUpperCase();
+
+  await connectDB();
+  const session = await Session.create({
+    title: title || "Session sans titre",
+    source_lang,
+    target_langs,
+    mode,
+    share_code,
+    is_live: true,
+    owner: payload.userId,
+    started_at: new Date(),
+  });
+
+  return json(res, 201, {
+    id: session._id.toString(),
+    share_code: session.share_code,
+    title: session.title,
+  });
 }
 
 /** GET /api/stream?share_code=X — SSE */
@@ -361,6 +390,7 @@ const httpServer = createServer(async (req, res) => {
     if (rawPath === "/api/auth/me" && req.method === "GET") return handleMe(req, res);
     if (rawPath === "/api/auth/signout" && req.method === "POST") return handleSignout(req, res);
     if (rawPath === "/api/sessions" && req.method === "GET") return handleGetSessions(req, res);
+    if (rawPath === "/api/sessions" && req.method === "POST") return handleCreateSession(req, res);
     if (rawPath === "/api/transcripts" && req.method === "POST") return handleAddTranscript(req, res);
     if (rawPath === "/api/stream" && req.method === "GET") return handleStream(req, res);
 

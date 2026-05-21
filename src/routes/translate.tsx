@@ -32,10 +32,22 @@ function TranslatePage() {
       return;
     }
 
-    const code = Math.random().toString(36).substring(2, 10).toUpperCase();
-    setShareCode(code);
-    setIsLive(true);
-    isLiveRef.current = true;
+    try {
+      const res = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "Session Live", mode: "live" }),
+      });
+      if (!res.ok) throw new Error("Erreur de création de session");
+      const data = await res.json();
+      const newCode = data.share_code;
+      setShareCode(newCode);
+      setIsLive(true);
+      isLiveRef.current = true;
+    } catch (e: any) {
+      toast.error(e.message || "Impossible de démarrer la session.");
+      return;
+    }
 
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -69,7 +81,7 @@ function TranslatePage() {
           await fetch("/api/transcripts", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ share_code: code, original_text: final, translations }),
+            body: JSON.stringify({ share_code: newCode, original_text: final, translations }),
           });
         } catch (e) {
           console.error("Failed to send transcript", e);
