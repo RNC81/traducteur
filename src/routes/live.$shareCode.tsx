@@ -59,6 +59,10 @@ function LivePage() {
           });
         } else if (data.id) {
           if (data.type === "final_draft" || data.type === "final_verified") {
+            // Merge last interim text so we never have an empty translation gap
+            if (data.type === "final_draft" && interimTranscript) {
+              data.translations = { ...interimTranscript.translations, ...(data.translations || {}) };
+            }
             setInterimTranscript(null); // clear interim when final arrives
           }
           setTranscripts((prev) => {
@@ -129,7 +133,7 @@ function LivePage() {
             transcripts.map((t) => (
               <div key={t.id} className="animate-in fade-in slide-in-from-bottom-2">
                 <div className={`text-2xl font-medium leading-relaxed md:text-4xl transition-colors duration-500 ${t.is_final === false ? 'text-muted-foreground' : 'text-foreground'}`}>
-                  {selectedLang === "ORIGINAL" ? t.original_text : (t.translations?.[selectedLang] || <span className="italic text-muted-foreground">Traduction en cours...</span>)}
+                  {selectedLang === "ORIGINAL" ? t.original_text : (t.translations?.[selectedLang] || t.original_text)}
                   {t.is_final === false && (
                     <span className="ml-3 inline-block h-2 w-2 rounded-full bg-primary/40 animate-pulse align-middle" title="Vérification IA en cours..." />
                   )}
