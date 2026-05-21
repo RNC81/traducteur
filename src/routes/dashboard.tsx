@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/Logo";
-import { LogOut, Mic, Sparkles, Radio, ChevronRight, Trash2, Eye } from "lucide-react";
+import { LogOut, Mic, Sparkles, Radio, ChevronRight, Trash2, Eye, MonitorPlay } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/dashboard")({ component: Dashboard });
 
@@ -59,6 +60,12 @@ function Dashboard() {
     } catch (e) {
       console.error(e);
     }
+  };
+
+  const copyOBSLink = (shareCode: string, lang: string) => {
+    const url = `${window.location.origin}/overlay/${shareCode}?lang=${lang}`;
+    navigator.clipboard.writeText(url);
+    toast.success("Lien Régie (OBS) copié !");
   };
 
   if (loading) return (
@@ -133,10 +140,13 @@ function Dashboard() {
                     </div>
                   </Link>
                   <div className="flex items-center gap-2">
-                    <Link to={`/live/${s.share_code}`} className="p-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-md">
+                    <button onClick={() => copyOBSLink(s.share_code, s.target_langs[0] || "FR")} className="p-2 text-muted-foreground hover:text-emerald-500 hover:bg-emerald-500/10 rounded-md" title="Copier le lien Régie/OBS">
+                      <MonitorPlay className="h-4 w-4" />
+                    </button>
+                    <Link to={`/live/${s.share_code}`} className="p-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-md" title="Revoir le live">
                       <Eye className="h-4 w-4" />
                     </Link>
-                    <button onClick={() => deleteSession(s.id)} className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-md">
+                    <button onClick={() => deleteSession(s.id)} className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-md" title="Supprimer la session">
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>

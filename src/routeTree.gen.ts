@@ -13,6 +13,7 @@ import { Route as TranslateRouteImport } from './routes/translate'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as OverlayShareCodeRouteImport } from './routes/overlay.$shareCode'
 import { Route as LiveShareCodeRouteImport } from './routes/live.$shareCode'
 
 const TranslateRoute = TranslateRouteImport.update({
@@ -35,6 +36,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OverlayShareCodeRoute = OverlayShareCodeRouteImport.update({
+  id: '/overlay/$shareCode',
+  path: '/overlay/$shareCode',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LiveShareCodeRoute = LiveShareCodeRouteImport.update({
   id: '/live/$shareCode',
   path: '/live/$shareCode',
@@ -47,6 +53,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/translate': typeof TranslateRoute
   '/live/$shareCode': typeof LiveShareCodeRoute
+  '/overlay/$shareCode': typeof OverlayShareCodeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -54,6 +61,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/translate': typeof TranslateRoute
   '/live/$shareCode': typeof LiveShareCodeRoute
+  '/overlay/$shareCode': typeof OverlayShareCodeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -62,12 +70,25 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/translate': typeof TranslateRoute
   '/live/$shareCode': typeof LiveShareCodeRoute
+  '/overlay/$shareCode': typeof OverlayShareCodeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/dashboard' | '/translate' | '/live/$shareCode'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/dashboard'
+    | '/translate'
+    | '/live/$shareCode'
+    | '/overlay/$shareCode'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/dashboard' | '/translate' | '/live/$shareCode'
+  to:
+    | '/'
+    | '/auth'
+    | '/dashboard'
+    | '/translate'
+    | '/live/$shareCode'
+    | '/overlay/$shareCode'
   id:
     | '__root__'
     | '/'
@@ -75,6 +96,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/translate'
     | '/live/$shareCode'
+    | '/overlay/$shareCode'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -83,6 +105,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   TranslateRoute: typeof TranslateRoute
   LiveShareCodeRoute: typeof LiveShareCodeRoute
+  OverlayShareCodeRoute: typeof OverlayShareCodeRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -115,6 +138,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/overlay/$shareCode': {
+      id: '/overlay/$shareCode'
+      path: '/overlay/$shareCode'
+      fullPath: '/overlay/$shareCode'
+      preLoaderRoute: typeof OverlayShareCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/live/$shareCode': {
       id: '/live/$shareCode'
       path: '/live/$shareCode'
@@ -131,6 +161,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   TranslateRoute: TranslateRoute,
   LiveShareCodeRoute: LiveShareCodeRoute,
+  OverlayShareCodeRoute: OverlayShareCodeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
