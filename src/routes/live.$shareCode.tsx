@@ -96,9 +96,18 @@ function LivePage() {
             onChange={(e) => setSelectedLang(e.target.value)}
             className="rounded-md border border-border bg-card px-3 py-1.5 text-sm"
           >
-            <option value="FR">Français</option>
-            <option value="AR">العربية</option>
-            <option value="ORIGINAL">{sourceLang} (Original)</option>
+            {[
+              { code: "FR", label: "Français", match: "fr" },
+              { code: "AR", label: "العربية", match: "ar" },
+              { code: "EN", label: "English", match: "en" }
+            ].map(lang => {
+              const isOriginal = sourceLang.toLowerCase().startsWith(lang.match);
+              return (
+                <option key={lang.code} value={isOriginal ? "ORIGINAL" : lang.code}>
+                  {lang.label} {isOriginal ? "(Original)" : ""}
+                </option>
+              );
+            })}
           </select>
           <div className="flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-xs">
             {isConnected ? (

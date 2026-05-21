@@ -251,7 +251,7 @@ async function handleAddInterimTranscript(req, res) {
     const promises = targetLangs.map(async (lang) => {
       const gLang = lang.toLowerCase();
       const result = await translateGoogle(original_text, { to: gLang });
-      return { lang, text: result.text };
+      return { lang: lang.toUpperCase(), text: result.text };
     });
     const results = await Promise.all(promises);
     results.forEach(r => { translations[r.lang] = r.text; });
@@ -286,8 +286,14 @@ async function handleAddTranscript(req, res) {
   if (session.owner.toString() !== payload.userId) return json(res, 403, { error: "Non autorisé." });
 
   // 1. FAST DRAFT
-  const targetLangs = session.target_langs || ["FR", "AR"];
-  const draftTranslations = await translateFast(original_text, session.context, targetLangs);
+  const targetLangs = session.target_langs || ["FR", "AR", "EN"];
+  const rawDraft = await translateFast(original_text, session.context, targetLangs);
+  
+  // Normalize keys to uppercase (LLMs often return lowercase keys)
+  const draftTranslations = {};
+  for (const [k, v] of Object.entries(rawDraft || {})) {
+    draftTranslations[k.toUpperCase()] = v;
+  }
 
   let transcript = await Transcript.create({
     session_id: session._id,
@@ -315,7 +321,12 @@ async function handleAddTranscript(req, res) {
   }
 
   // 2. BACKGROUND VERIFICATION
-  verifyTranslation(original_text, safeTranslations, session.context, targetLangs).then(async (finalTranslations) => {
+  verifyTranslation(original_text, safeTranslations, session.context, targetLangs).then(async (rawFinal) => {
+    const finalTranslations = {};
+    for (const [k, v] of Object.entries(rawFinal || {})) {
+      finalTranslations[k.toUpperCase()] = v;
+    }
+
     transcript.translations = finalTranslations;
     transcript.is_final = true;
     await transcript.save();
@@ -454,7 +465,7 @@ async function handleCreateSession(req, res) {
   const payload = getUserFromCookie(req);
   if (!payload) return json(res, 401, { error: "Non authentifié." });
 
-  const { title, source_lang = "fr-FR", target_langs = ["FR", "AR"], mode = "live", context = "" } = await readBody(req);
+  const { title, source_lang = "fr-FR", target_langs = ["FR", "AR", "EN"], mode = "live", context = "" } = await readBody(req);
 
   // Generate a unique share_code
   const share_code = Math.random().toString(36).substring(2, 10).toUpperCase();
