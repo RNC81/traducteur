@@ -8,6 +8,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { Toaster } from "sonner";
+import { CookieBanner } from "@/components/CookieBanner";
 
 import appCss from "../styles.css?url";
 
@@ -95,6 +96,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <Outlet />
       <Toaster position="top-center" richColors />
+      <CookieBanner />
     </QueryClientProvider>
   );
 }

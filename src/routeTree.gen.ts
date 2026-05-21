@@ -10,6 +10,9 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TranslateRouteImport } from './routes/translate'
+import { Route as TermsRouteImport } from './routes/terms'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as LegalRouteImport } from './routes/legal'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -21,6 +24,21 @@ import { Route as LiveShareCodeRouteImport } from './routes/live.$shareCode'
 const TranslateRoute = TranslateRouteImport.update({
   id: '/translate',
   path: '/translate',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegalRoute = LegalRouteImport.update({
+  id: '/legal',
+  path: '/legal',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -65,6 +83,9 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
+  '/legal': typeof LegalRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/translate': typeof TranslateRoute
   '/live/$shareCode': typeof LiveShareCodeRoute
   '/overlay/$shareCode': typeof OverlayShareCodeRoute
@@ -75,6 +96,9 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
+  '/legal': typeof LegalRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/translate': typeof TranslateRoute
   '/live/$shareCode': typeof LiveShareCodeRoute
   '/overlay/$shareCode': typeof OverlayShareCodeRoute
@@ -86,6 +110,9 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
+  '/legal': typeof LegalRoute
+  '/privacy': typeof PrivacyRoute
+  '/terms': typeof TermsRoute
   '/translate': typeof TranslateRoute
   '/live/$shareCode': typeof LiveShareCodeRoute
   '/overlay/$shareCode': typeof OverlayShareCodeRoute
@@ -98,6 +125,9 @@ export interface FileRouteTypes {
     | '/auth'
     | '/contact'
     | '/dashboard'
+    | '/legal'
+    | '/privacy'
+    | '/terms'
     | '/translate'
     | '/live/$shareCode'
     | '/overlay/$shareCode'
@@ -108,6 +138,9 @@ export interface FileRouteTypes {
     | '/auth'
     | '/contact'
     | '/dashboard'
+    | '/legal'
+    | '/privacy'
+    | '/terms'
     | '/translate'
     | '/live/$shareCode'
     | '/overlay/$shareCode'
@@ -118,6 +151,9 @@ export interface FileRouteTypes {
     | '/auth'
     | '/contact'
     | '/dashboard'
+    | '/legal'
+    | '/privacy'
+    | '/terms'
     | '/translate'
     | '/live/$shareCode'
     | '/overlay/$shareCode'
@@ -129,6 +165,9 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   ContactRoute: typeof ContactRoute
   DashboardRoute: typeof DashboardRoute
+  LegalRoute: typeof LegalRoute
+  PrivacyRoute: typeof PrivacyRoute
+  TermsRoute: typeof TermsRoute
   TranslateRoute: typeof TranslateRoute
   LiveShareCodeRoute: typeof LiveShareCodeRoute
   OverlayShareCodeRoute: typeof OverlayShareCodeRoute
@@ -141,6 +180,27 @@ declare module '@tanstack/react-router' {
       path: '/translate'
       fullPath: '/translate'
       preLoaderRoute: typeof TranslateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legal': {
+      id: '/legal'
+      path: '/legal'
+      fullPath: '/legal'
+      preLoaderRoute: typeof LegalRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -201,6 +261,9 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ContactRoute: ContactRoute,
   DashboardRoute: DashboardRoute,
+  LegalRoute: LegalRoute,
+  PrivacyRoute: PrivacyRoute,
+  TermsRoute: TermsRoute,
   TranslateRoute: TranslateRoute,
   LiveShareCodeRoute: LiveShareCodeRoute,
   OverlayShareCodeRoute: OverlayShareCodeRoute,
