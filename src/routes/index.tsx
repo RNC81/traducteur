@@ -3,78 +3,134 @@ import { SiteNav } from "@/components/SiteNav";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Mic, Globe2, Sparkles, ShieldCheck, BookOpen, Languages, Zap, Users, Check } from "lucide-react";
 
+import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+
 export const Route = createFileRoute("/")({ component: Index });
 
 const LANGS = ["English", "العربية", "Français", "Español", "Türkçe", "اردو", "فارسی", "Bahasa", "Deutsch", "Português", "हिन्दी", "Русский"];
 
+function Phone3D() {
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+
+  const mouseXSpring = useSpring(x, { stiffness: 300, damping: 30 });
+  const mouseYSpring = useSpring(y, { stiffness: 300, damping: 30 });
+
+  const rotateX = useTransform(mouseYSpring, [-0.5, 0.5], ["15deg", "-15deg"]);
+  const rotateY = useTransform(mouseXSpring, [-0.5, 0.5], ["-15deg", "15deg"]);
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const xPct = mouseX / rect.width - 0.5;
+    const yPct = mouseY / rect.height - 0.5;
+    x.set(xPct);
+    y.set(yPct);
+  };
+
+  const handleMouseLeave = () => {
+    x.set(0);
+    y.set(0);
+  };
+
+  return (
+    <div 
+      className="relative w-[280px] h-[580px] perspective-[1200px]" 
+      onMouseMove={handleMouseMove} 
+      onMouseLeave={handleMouseLeave}
+    >
+      <motion.div
+        style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}
+        className="w-full h-full relative rounded-[3rem] border-8 border-stone-900 bg-background shadow-2xl shadow-emerald-500/20"
+      >
+        <div className="absolute inset-0 rounded-[2.5rem] overflow-hidden bg-background">
+          <div className="h-12 flex justify-between items-center px-6 border-b border-border text-[10px]">
+             <span className="font-semibold tracking-wider text-muted-foreground">VERBA LIVE</span>
+             <span className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"/> 14 listeners</span>
+          </div>
+          <div className="p-4 space-y-4">
+             <Bubble lang="EN · original" text="Welcome everyone. Today we'll talk about how language can unite us." />
+             <Bubble lang="FR · français" text="Bienvenue à tous. Aujourd'hui, nous allons parler de la façon dont la langue peut nous unir." accent />
+             <div className="animate-pulse text-muted-foreground/50 text-sm italic pt-2">Listening...</div>
+          </div>
+        </div>
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-24 h-6 bg-stone-900 rounded-full" style={{ transform: "translateZ(1px)" }} />
+        <div className="absolute inset-0 rounded-[2.5rem] pointer-events-none bg-gradient-to-tr from-white/0 via-white/10 to-white/0" style={{ transform: "translateZ(2px)" }} />
+      </motion.div>
+    </div>
+  );
+}
+
 function Index() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <SiteNav />
+    <div className="h-screen overflow-y-scroll snap-y snap-mandatory scroll-smooth bg-background text-foreground hide-scrollbar">
+      {/* HEADER FIXED */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
+        <SiteNav />
+      </div>
 
-      {/* HERO */}
-      <section className="relative overflow-hidden">
+      {/* HERO SECTION */}
+      <section className="relative h-screen snap-center flex items-center justify-center overflow-hidden pt-16">
         <div className="pointer-events-none absolute inset-0 -z-10 opacity-60"
              style={{ background: "radial-gradient(60% 50% at 50% 0%, color-mix(in oklch, var(--primary) 18%, transparent), transparent 70%)" }} />
-        <div className="mx-auto max-w-5xl px-6 pt-24 pb-20 text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-            Live translation, powered by AI
-          </div>
-          <h1 className="mt-6 font-display text-5xl leading-[1.05] tracking-tight md:text-7xl">
-            Speak once.<br/>
-            <span className="text-primary italic">Heard everywhere.</span>
-          </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
-            Verba turns your voice into instant, accurate translation for any audience —
-            conferences, classrooms, livestreams, and faith gatherings.
-          </p>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Link to="/auth" className="rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90">
-              Start translating free
-            </Link>
-            <a href="#demo" className="rounded-md border border-border bg-background px-6 py-3 text-sm font-medium hover:bg-accent">
-              See it in action
-            </a>
-          </div>
-
-          {/* Demo card */}
-          <div id="demo" className="mx-auto mt-16 max-w-3xl rounded-2xl border border-border bg-card p-1 shadow-2xl shadow-emerald-900/5">
-            <div className="rounded-xl bg-gradient-to-br from-background to-muted p-6 text-left">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                  <span className="font-medium">Live</span>
-                  <span className="text-muted-foreground">· Speaker: EN</span>
-                </div>
-                <div className="text-xs text-muted-foreground">12 listeners</div>
-              </div>
-              <div className="mt-5 space-y-4">
-                <Bubble lang="EN · original" text="Welcome everyone. Today we'll talk about how language can unite us across borders." />
-                <Bubble lang="FR · français" text="Bienvenue à tous. Aujourd'hui, nous allons parler de la façon dont la langue peut nous unir au-delà des frontières." accent />
-                <Bubble lang="AR · العربية" text="مرحباً بالجميع. اليوم سنتحدث عن كيف يمكن للغة أن توحدنا عبر الحدود." accent />
-              </div>
+        
+        <div className="mx-auto max-w-6xl w-full px-6 grid md:grid-cols-2 gap-12 items-center">
+          <motion.div 
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            className="text-left"
+          >
+            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground mb-6">
+              <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+              Live translation, powered by AI
             </div>
-          </div>
+            <h1 className="font-display text-5xl leading-[1.05] tracking-tight md:text-7xl">
+              Speak once.<br/>
+              <span className="text-primary italic">Heard everywhere.</span>
+            </h1>
+            <p className="mt-6 max-w-xl text-lg text-muted-foreground">
+              Verba turns your voice into instant, accurate translation for any audience —
+              conferences, classrooms, livestreams, and faith gatherings.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <Link to="/auth" className="rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90 transition-transform hover:scale-105 active:scale-95">
+                Start translating free
+              </Link>
+              <a href="#features" className="rounded-md border border-border bg-background px-6 py-3 text-sm font-medium hover:bg-accent transition-colors">
+                Explore features
+              </a>
+            </div>
+            <div className="mt-8 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              {LANGS.slice(0, 5).map(l => (
+                <span key={l} className="rounded-full border border-border bg-background/60 px-3 py-1">{l}</span>
+              ))}
+              <span className="rounded-full border border-border bg-background/60 px-3 py-1">+ 80 more</span>
+            </div>
+          </motion.div>
 
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-2 text-xs text-muted-foreground">
-            {LANGS.map(l => (
-              <span key={l} className="rounded-full border border-border bg-background/60 px-3 py-1">{l}</span>
-            ))}
-            <span className="rounded-full border border-border bg-background/60 px-3 py-1">+ 80 more</span>
-          </div>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 1, delay: 0.2 }}
+            className="flex justify-center md:justify-end"
+          >
+            <Phone3D />
+          </motion.div>
         </div>
       </section>
 
       {/* FEATURES */}
-      <section id="features" className="border-t border-border/60 bg-background">
-        <div className="mx-auto max-w-6xl px-6 py-24">
+      {/* FEATURES SECTION */}
+      <section id="features" className="h-screen snap-center flex items-center justify-center border-t border-border/60 bg-background relative pt-16">
+        <div className="mx-auto max-w-6xl w-full px-6">
           <div className="max-w-2xl">
             <div className="text-xs font-semibold uppercase tracking-wider text-primary">Features</div>
             <h2 className="mt-2 font-display text-4xl md:text-5xl">Built for the moment you speak.</h2>
             <p className="mt-4 text-muted-foreground">Low-latency speech translation, transcripts in every language, and tools designed for real audiences.</p>
           </div>
-          <div className="mt-14 grid gap-6 md:grid-cols-3">
+          <div className="mt-10 grid gap-6 md:grid-cols-3">
             <Feature icon={<Mic />} title="Real-time speech" text="Speak naturally. Translations stream to your audience with sub-second latency." />
             <Feature icon={<Globe2 />} title="80+ languages" text="From Arabic to Mandarin, with right-to-left and script support handled out of the box." />
             <Feature icon={<Sparkles />} title="AI that understands context" text="Specialized prompts keep meaning, tone, and terminology consistent across a full talk." />
@@ -85,10 +141,10 @@ function Index() {
         </div>
       </section>
 
-      {/* FAITH MODE */}
-      <section id="faith" className="bg-stone-950 text-stone-100">
-        <div className="mx-auto grid max-w-6xl gap-12 px-6 py-24 md:grid-cols-2 md:items-center">
-          <div>
+      {/* FAITH MODE SECTION */}
+      <section id="faith" className="h-screen snap-center flex items-center justify-center bg-stone-950 text-stone-100 relative pt-16">
+        <div className="mx-auto grid max-w-6xl w-full gap-12 px-6 md:grid-cols-2 md:items-center">
+          <motion.div initial={{ opacity: 0, x: -40 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300">
               <Sparkles className="h-3 w-3" /> Faith Mode
             </div>
@@ -102,17 +158,9 @@ function Index() {
               <FaithItem text="Respectful tone for sermons, lectures, and ziyarat" />
               <FaithItem text="Optimized for live majalis and recorded khutbahs alike" />
             </ul>
-            <div className="mt-8">
-              <div className="text-xs uppercase tracking-wider text-stone-400">Reference corpus</div>
-              <div className="mt-3 flex flex-wrap gap-2 text-xs">
-                {["Al-Islam.org", "Nahj al-Balagha", "Sahifa al-Sajjadiyya", "Tafsir al-Mizan"].map(s => (
-                  <span key={s} className="rounded-full border border-stone-700 bg-stone-900 px-3 py-1 text-stone-200">{s}</span>
-                ))}
-              </div>
-            </div>
-          </div>
+          </motion.div>
 
-          <div className="rounded-2xl border border-stone-800 bg-stone-900/60 p-6 shadow-2xl">
+          <motion.div initial={{ opacity: 0, x: 40 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} className="rounded-2xl border border-stone-800 bg-stone-900/60 p-6 shadow-2xl">
             <div className="flex items-center justify-between text-xs text-stone-400">
               <span>Majlis · live</span>
               <span className="text-emerald-300">Faith Mode ON</span>
@@ -125,25 +173,19 @@ function Index() {
                 </div>
               </div>
               <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
-                <div className="text-[10px] uppercase tracking-wider text-emerald-300">EN · translation</div>
-                <div className="mt-2 leading-relaxed">
-                  In the Name of Allah, the Most Gracious, the Most Merciful — all praise is due to Allah, Lord of the worlds.
-                </div>
-              </div>
-              <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4">
                 <div className="text-[10px] uppercase tracking-wider text-emerald-300">FR · traduction</div>
                 <div className="mt-2 leading-relaxed">
                   Au Nom d'Allah, le Tout Miséricordieux, le Très Miséricordieux — louange à Allah, Seigneur des mondes.
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* USE CASES */}
-      <section className="border-y border-border/60 bg-background">
-        <div className="mx-auto max-w-6xl px-6 py-24">
+      <section className="h-screen snap-center flex items-center justify-center border-y border-border/60 bg-background relative pt-16">
+        <div className="mx-auto max-w-6xl w-full px-6">
           <div className="text-center">
             <div className="text-xs font-semibold uppercase tracking-wider text-primary">Use cases</div>
             <h2 className="mt-2 font-display text-4xl md:text-5xl">One tool. Every audience.</h2>
@@ -156,36 +198,32 @@ function Index() {
           </div>
         </div>
       </section>
-
-      {/* PRICING */}
-      <section id="pricing" className="bg-background">
-        <div className="mx-auto max-w-6xl px-6 py-24">
+      {/* PRICING & CTA SECTION */}
+      <section id="pricing" className="h-screen snap-center flex flex-col justify-between bg-background relative pt-16">
+        <div className="mx-auto max-w-6xl w-full px-6 flex-1 flex flex-col justify-center">
           <div className="text-center">
             <div className="text-xs font-semibold uppercase tracking-wider text-primary">Pricing</div>
             <h2 className="mt-2 font-display text-4xl md:text-5xl">Simple, fair, scalable.</h2>
           </div>
-          <div className="mt-14 grid gap-6 md:grid-cols-3">
+          <div className="mt-10 grid gap-6 md:grid-cols-3">
             <Plan name="Free" price="$0" desc="Try Verba live with short sessions." features={["30 min / month", "Up to 5 audience listeners", "12 languages", "Web access"]} />
             <Plan featured name="Pro" price="$19" desc="For creators, teachers, and speakers." features={["Unlimited sessions", "Up to 100 listeners", "80+ languages", "Faith Mode", "Export transcripts"]} />
             <Plan name="Organization" price="Custom" desc="For mosques, institutes, and enterprises." features={["Unlimited listeners", "Custom branding", "Priority models", "SSO & admin", "Dedicated support"]} />
           </div>
         </div>
-      </section>
-
-      {/* CTA */}
-      <section className="bg-stone-950 text-stone-100">
-        <div className="mx-auto max-w-4xl px-6 py-24 text-center">
-          <h2 className="font-display text-4xl md:text-5xl text-white">Your voice. Every language.</h2>
-          <p className="mx-auto mt-4 max-w-xl text-stone-300">Start a live translated session in under a minute. No setup, no apps for your audience.</p>
-          <div className="mt-8">
-            <Link to="/auth" className="inline-flex rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-              Get started — it's free
-            </Link>
+        
+        <div className="w-full bg-stone-950 text-stone-100 mt-auto">
+          <div className="mx-auto max-w-4xl px-6 py-12 text-center">
+            <h2 className="font-display text-3xl md:text-4xl text-white">Your voice. Every language.</h2>
+            <div className="mt-6">
+              <Link to="/auth" className="inline-flex rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-transform hover:scale-105">
+                Get started — it's free
+              </Link>
+            </div>
           </div>
+          <SiteFooter />
         </div>
       </section>
-
-      <SiteFooter />
     </div>
   );
 }

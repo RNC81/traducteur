@@ -182,7 +182,11 @@ async function verifyTranslation(originalText, draftTranslations, contextStr, ta
   if (!openaiKey && !mistralKey) return draftTranslations; // No verifier available
 
   const contextPrompt = contextStr ? ` Le contexte de ce discours est : "${contextStr}".` : "";
-  const prompt = `Vous êtes un relecteur expert. Voici un texte original en langue source et sa traduction automatique préliminaire dans [${targetLangs.join(", ")}].${contextPrompt} Corrigez les erreurs de sens, les contresens, et assurez-vous que le vocabulaire est parfaitement adapté au contexte (notamment théologique si applicable). Renvoyez UNIQUEMENT un objet JSON valide avec les codes de langue comme clés et les traductions corrigées comme valeurs. Conservez bien toutes les clés de langue demandées.`;
+  const prompt = `Vous êtes un relecteur expert et un traducteur spécialisé dans la théologie islamique, avec une maîtrise approfondie du vocabulaire et des concepts du Chiisme duodécimain (Ahl al-Bayt, Imamat, Fiqh Ja'fari). Voici un texte original en langue source et sa traduction automatique préliminaire dans [${targetLangs.join(", ")}].${contextPrompt} 
+Votre mission :
+1. Corriger les erreurs de sens et les contresens.
+2. Assurez-vous que la terminologie religieuse employée est exacte, respectueuse et parfaitement alignée avec la doctrine chiite (par exemple, privilégier le vocabulaire approprié pour les Infaillibles, la jurisprudence, etc.).
+3. Renvoyer UNIQUEMENT un objet JSON valide avec les codes de langue comme clés et les traductions corrigées comme valeurs. Conservez bien toutes les clés de langue demandées.`;
   
   const userMessage = `Texte original : "${originalText}"\nTraductions préliminaires : ${JSON.stringify(draftTranslations)}`;
 

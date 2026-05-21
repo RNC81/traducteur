@@ -9,7 +9,7 @@ export function SiteNav() {
         <nav className="hidden items-center gap-8 text-sm text-muted-foreground md:flex">
           <a href="/#features" className="hover:text-foreground">Features</a>
           <a href="/#faith" className="hover:text-foreground">Faith Mode</a>
-          <Link to="/pricing" className="hover:text-foreground">Pricing</Link>
+          <a href="/#pricing" className="hover:text-foreground">Pricing</a>
           <Link to="/about" className="hover:text-foreground">About</Link>
           <Link to="/contact" className="hover:text-foreground">Contact</Link>
         </nav>
