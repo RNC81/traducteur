@@ -1,7 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useRef } from "react";
-import { getSessionFn } from "@/api/auth";
-import { addTranscriptFn } from "@/api/live";
 import { Logo } from "@/components/Logo";
 import { Mic, MicOff, Settings, Radio } from "lucide-react";
 import { toast } from "sonner";
@@ -14,74 +12,64 @@ function TranslatePage() {
   const [shareCode, setShareCode] = useState<string | null>(null);
   const [interimText, setInterimText] = useState("");
   const [finalTexts, setFinalTexts] = useState<{ id: number; text: string }[]>([]);
-  
   const recognitionRef = useRef<any>(null);
+  const isLiveRef = useRef(false);
 
   useEffect(() => {
-    getSessionFn().then(({ user }) => {
-      if (!user) navigate({ to: "/auth" });
-    });
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then(({ user }) => { if (!user) navigate({ to: "/auth" }); })
+      .catch(() => navigate({ to: "/auth" }));
   }, [navigate]);
 
   const toggleLive = async () => {
     if (isLive) {
-      // Stop logic
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
+      recognitionRef.current?.stop();
+      isLiveRef.current = false;
       setIsLive(false);
-      toast.success("Session ended.");
+      toast.success("Session terminée.");
       navigate({ to: "/dashboard" });
       return;
     }
 
-    // Start logic
     const code = Math.random().toString(36).substring(2, 10).toUpperCase();
     setShareCode(code);
     setIsLive(true);
-    
-    // Web Speech API
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    isLiveRef.current = true;
+
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      toast.error("Your browser does not support Speech Recognition. Try Chrome or Safari.");
+      toast.error("Votre navigateur ne supporte pas la reconnaissance vocale. Essayez Chrome ou Safari.");
       setIsLive(false);
+      isLiveRef.current = false;
       return;
     }
 
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = "en-US"; // Hardcoded for now
+    recognition.lang = "fr-FR";
 
     recognition.onresult = async (event: any) => {
       let interim = "";
       let final = "";
-
       for (let i = event.resultIndex; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          final += event.results[i][0].transcript;
-        } else {
-          interim += event.results[i][0].transcript;
-        }
+        if (event.results[i].isFinal) final += event.results[i][0].transcript;
+        else interim += event.results[i][0].transcript;
       }
-
       setInterimText(interim);
       if (final) {
         setFinalTexts((prev) => [...prev, { id: Date.now(), text: final }]);
-        
-        // Mock translation
         const translations = {
-          "FR": "Traduction simulée: " + final,
-          "AR": "ترجمة وهمية: " + final
+          FR: "Traduction simulée : " + final,
+          AR: "ترجمة وهمية: " + final,
         };
-
         try {
-          await addTranscriptFn({
-            data: {
-              share_code: code,
-              original_text: final,
-              translations,
-            }
+          await fetch("/api/transcripts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ share_code: code, original_text: final, translations }),
           });
         } catch (e) {
           console.error("Failed to send transcript", e);
@@ -94,10 +82,7 @@ function TranslatePage() {
     };
 
     recognition.onend = () => {
-      if (isLive) {
-        // Restart if it stops automatically
-        recognition.start();
-      }
+      if (isLiveRef.current) recognition.start();
     };
 
     recognition.start();
@@ -111,9 +96,14 @@ function TranslatePage() {
         <div className="flex items-center gap-4">
           {shareCode && (
             <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-1.5 text-sm">
-              <span className="text-muted-foreground">Listener link:</span>
-              <a href={`/live/${shareCode}`} target="_blank" rel="noreferrer" className="font-mono font-medium hover:underline">
-                verba.app/live/{shareCode}
+              <span className="text-muted-foreground">Lien audience :</span>
+              <a
+                href={`/live/${shareCode}`}
+                target="_blank"
+                rel="noreferrer"
+                className="font-mono font-medium hover:underline"
+              >
+                /live/{shareCode}
               </a>
             </div>
           )}
@@ -129,9 +119,9 @@ function TranslatePage() {
             <div className="mb-8 flex items-center justify-center rounded-full bg-red-500/10 p-6 shadow-2xl shadow-red-500/20">
               <Radio className="h-16 w-16 animate-pulse text-red-500" />
             </div>
-            <h2 className="text-2xl font-medium">You are live</h2>
-            <p className="mt-2 text-muted-foreground text-center max-w-md">
-              Speak naturally. Your audience is receiving real-time translations.
+            <h2 className="text-2xl font-medium">Vous êtes en direct</h2>
+            <p className="mt-2 max-w-md text-center text-muted-foreground">
+              Parlez naturellement. Votre audience reçoit les traductions en temps réel.
             </p>
           </div>
         ) : (
@@ -139,32 +129,34 @@ function TranslatePage() {
             <div className="mb-8 flex items-center justify-center rounded-full bg-primary/10 p-6">
               <Mic className="h-16 w-16 text-primary" />
             </div>
-            <h2 className="text-2xl font-medium">Ready to start?</h2>
-            <p className="mt-2 text-muted-foreground">Start speaking to broadcast translations.</p>
+            <h2 className="text-2xl font-medium">Prêt à démarrer ?</h2>
+            <p className="mt-2 text-muted-foreground">Commencez à parler pour diffuser les traductions.</p>
           </div>
         )}
 
         <div className="mt-12 w-full max-w-2xl">
-          <div className="rounded-xl border border-border bg-card p-6 min-h-[200px]">
+          <div className="min-h-[200px] rounded-xl border border-border bg-card p-6">
             {finalTexts.map((t) => (
               <p key={t.id} className="mb-2 text-lg text-foreground">{t.text}</p>
             ))}
-            <p className="text-lg text-muted-foreground italic">{interimText}</p>
+            <p className="text-lg italic text-muted-foreground">{interimText}</p>
           </div>
         </div>
       </main>
 
-      <footer className="border-t border-border bg-background p-4 flex justify-center">
+      <footer className="flex justify-center border-t border-border bg-background p-4">
         <button
           onClick={toggleLive}
           className={`flex items-center gap-2 rounded-full px-8 py-4 text-base font-medium text-white shadow-xl transition-transform hover:scale-105 active:scale-95 ${
-            isLive ? "bg-red-500 hover:bg-red-600 shadow-red-500/20" : "bg-primary hover:bg-primary/90 shadow-primary/20"
+            isLive
+              ? "bg-red-500 shadow-red-500/20 hover:bg-red-600"
+              : "bg-primary shadow-primary/20 hover:bg-primary/90"
           }`}
         >
           {isLive ? (
-            <><MicOff className="h-5 w-5" /> Stop session</>
+            <><MicOff className="h-5 w-5" /> Arrêter la session</>
           ) : (
-            <><Mic className="h-5 w-5" /> Start speaking</>
+            <><Mic className="h-5 w-5" /> Commencer à parler</>
           )}
         </button>
       </footer>

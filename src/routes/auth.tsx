@@ -2,7 +2,6 @@ import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/Logo";
 import { toast } from "sonner";
-import { getSessionFn, signUpWithEmailFn } from "@/api/auth";
 
 export const Route = createFileRoute("/auth")({ component: AuthPage });
 
@@ -14,9 +13,12 @@ function AuthPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
 
   useEffect(() => {
-    getSessionFn().then((data) => {
-      if (data.user) navigate({ to: "/dashboard" });
-    });
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.user) navigate({ to: "/dashboard" });
+      })
+      .catch(() => {});
   }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -26,8 +28,16 @@ function AuthPage() {
 
     setLoading(true);
     try {
-      const result = await signUpWithEmailFn({ data: { email, password } });
-      if (result.isNew) {
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || "Erreur inattendue.");
+
+      if (data.isNew) {
         toast.success("Compte créé avec succès ! Bienvenue 🎉");
       } else {
         toast.success("Connexion réussie !");
@@ -92,8 +102,8 @@ function AuthPage() {
             <div>
               <label className="mb-1 block text-sm font-medium">Email</label>
               <input
-                type="email"
                 id="auth-email"
+                type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
@@ -105,8 +115,8 @@ function AuthPage() {
             <div>
               <label className="mb-1 block text-sm font-medium">Mot de passe</label>
               <input
-                type="password"
                 id="auth-password"
+                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"

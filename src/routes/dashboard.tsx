@@ -1,7 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { getSessionFn, signOutFn } from "@/api/auth";
-import { getSessionsFn } from "@/api/sessions";
 import { Logo } from "@/components/Logo";
 import { LogOut, Mic, Sparkles, Radio, ChevronRight } from "lucide-react";
 
@@ -27,16 +25,17 @@ function Dashboard() {
   useEffect(() => {
     async function loadData() {
       try {
-        const { user } = await getSessionFn();
-        if (!user) {
-          navigate({ to: "/auth" });
-          return;
-        }
+        const meRes = await fetch("/api/auth/me");
+        const { user } = await meRes.json();
+        if (!user) { navigate({ to: "/auth" }); return; }
         setEmail(user.email);
-        
-        const rows = await getSessionsFn();
-        setSessions(rows as SessionRow[]);
-      } catch (err) {
+
+        const sessRes = await fetch("/api/sessions");
+        if (sessRes.ok) {
+          const rows = await sessRes.json();
+          setSessions(rows);
+        }
+      } catch {
         navigate({ to: "/auth" });
       } finally {
         setLoading(false);
@@ -46,11 +45,15 @@ function Dashboard() {
   }, [navigate]);
 
   const signOut = async () => {
-    await signOutFn();
+    await fetch("/api/auth/signout", { method: "POST" });
     navigate({ to: "/" });
   };
 
-  if (loading) return <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">Loading…</div>;
+  if (loading) return (
+    <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
+      Chargement…
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -59,27 +62,43 @@ function Dashboard() {
           <Link to="/"><Logo /></Link>
           <div className="flex items-center gap-4">
             <span className="hidden text-sm text-muted-foreground sm:inline">{email}</span>
-            <button onClick={signOut} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent">
-              <LogOut className="h-4 w-4" /> Sign out
+            <button
+              onClick={signOut}
+              className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent"
+            >
+              <LogOut className="h-4 w-4" /> Se déconnecter
             </button>
           </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-6xl px-6 py-12">
-        <h1 className="font-display text-4xl">Welcome back.</h1>
-        <p className="mt-2 text-muted-foreground">Start a live session or open Faith Mode for religious content.</p>
+        <h1 className="font-display text-4xl">Bon retour.</h1>
+        <p className="mt-2 text-muted-foreground">Démarrez une session live ou ouvrez le Mode Foi.</p>
 
         <div className="mt-10 grid gap-6 md:grid-cols-2">
-          <ActionCard to="/translate" icon={<Mic className="h-5 w-5" />} title="New live session" desc="Translate your voice in real time to 80+ languages." cta="Start session" />
-          <ActionCard to="/translate" icon={<Sparkles className="h-5 w-5" />} title="Faith Mode" desc="Dedicated mode for khutbahs and Shia religious content." cta="Open Faith Mode" accent />
+          <ActionCard
+            to="/translate"
+            icon={<Mic className="h-5 w-5" />}
+            title="Nouvelle session live"
+            desc="Traduisez votre voix en temps réel dans 80+ langues."
+            cta="Démarrer une session"
+          />
+          <ActionCard
+            to="/translate"
+            icon={<Sparkles className="h-5 w-5" />}
+            title="Mode Foi"
+            desc="Mode dédié aux khutbahs et au contenu religieux chiite."
+            cta="Ouvrir le Mode Foi"
+            accent
+          />
         </div>
 
         <div className="mt-12">
-          <h2 className="font-display text-2xl">Recent sessions</h2>
+          <h2 className="font-display text-2xl">Sessions récentes</h2>
           {sessions.length === 0 ? (
             <div className="mt-4 rounded-xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground">
-              You haven't run any sessions yet. Start your first one above.
+              Vous n'avez pas encore de sessions. Lancez votre première ci-dessus.
             </div>
           ) : (
             <ul className="mt-4 divide-y divide-border rounded-xl border border-border bg-card">
@@ -88,11 +107,17 @@ function Dashboard() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="truncate font-medium">{s.title || "Session sans titre"}</span>
-                      {s.is_live && <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-1.5 py-0.5 text-[10px] text-red-600"><Radio className="h-2.5 w-2.5 animate-pulse" /> Live</span>}
-                      {s.mode === "faith" && <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-700">Faith</span>}
+                      {s.is_live && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-1.5 py-0.5 text-[10px] text-red-600">
+                          <Radio className="h-2.5 w-2.5 animate-pulse" /> Live
+                        </span>
+                      )}
+                      {s.mode === "faith" && (
+                        <span className="rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-700">Foi</span>
+                      )}
                     </div>
                     <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                      {new Date(s.started_at).toLocaleString()} · {s.source_lang} → {s.target_langs.join(", ")}
+                      {new Date(s.started_at).toLocaleString("fr-FR")} · {s.source_lang} → {s.target_langs.join(", ")}
                     </div>
                   </div>
                   <ChevronRight className="h-4 w-4 flex-none text-muted-foreground" />
@@ -106,13 +131,20 @@ function Dashboard() {
   );
 }
 
-function ActionCard({ to, icon, title, desc, cta, accent = false }: { to: string; icon: React.ReactNode; title: string; desc: string; cta: string; accent?: boolean }) {
+function ActionCard({
+  to, icon, title, desc, cta, accent = false,
+}: {
+  to: string; icon: React.ReactNode; title: string; desc: string; cta: string; accent?: boolean;
+}) {
   return (
     <div className={`rounded-2xl border p-6 ${accent ? "border-primary/40 bg-primary/[0.04]" : "border-border bg-card"}`}>
       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">{icon}</div>
       <h3 className="mt-4 font-display text-xl">{title}</h3>
       <p className="mt-2 text-sm text-muted-foreground">{desc}</p>
-      <Link to={to} className={`mt-6 inline-block rounded-md px-4 py-2 text-sm font-medium ${accent ? "bg-primary text-primary-foreground hover:bg-primary/90" : "border border-border hover:bg-accent"}`}>
+      <Link
+        to={to}
+        className={`mt-6 inline-block rounded-md px-4 py-2 text-sm font-medium ${accent ? "bg-primary text-primary-foreground hover:bg-primary/90" : "border border-border hover:bg-accent"}`}
+      >
         {cta}
       </Link>
     </div>
