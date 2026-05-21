@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import { Logo } from "@/components/Logo";
 import { Mic, MicOff, Settings, Radio, MonitorPlay } from "lucide-react";
 import { toast } from "sonner";
+import { SUPPORTED_LANGUAGES } from "@/lib/languages";
 
 export const Route = createFileRoute("/translate")({ component: TranslatePage });
 
@@ -18,7 +19,7 @@ function TranslatePage() {
   const interimRef = useRef("");
   const lastSentInterimRef = useRef("");
   const [context, setContext] = useState("");
-  const [sourceLang, setSourceLang] = useState("fr-FR");
+  const [sourceLang, setSourceLang] = useState("fr");
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -204,12 +205,9 @@ function TranslatePage() {
                   onChange={(e) => setSourceLang(e.target.value)}
                   className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
                 >
-                  <option value="fr-FR">Français</option>
-                  <option value="en-US">Anglais</option>
-                  <option value="ar-SA">Arabe</option>
-                  <option value="fa-IR">Farsi / Perse</option>
-                  <option value="ur-PK">Ourdou (Urdu)</option>
-                  <option value="hi-IN">Hindi</option>
+                  {SUPPORTED_LANGUAGES.map((l) => (
+                    <option key={l.code} value={l.code}>{l.label}</option>
+                  ))}
                 </select>
               </div>
 

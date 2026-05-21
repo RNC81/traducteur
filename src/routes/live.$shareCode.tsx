@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useRef } from "react";
 import { Logo } from "@/components/Logo";
 import { Radio } from "lucide-react";
+import { SUPPORTED_LANGUAGES } from "@/lib/languages";
 
 export const Route = createFileRoute("/live/$shareCode")({ component: LivePage });
 
@@ -21,6 +22,7 @@ function LivePage() {
   const [sourceLang, setSourceLang] = useState("fr-FR");
   const [isConnected, setIsConnected] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const interimRef = useRef<{ original_text: string, translations: Record<string, string> } | null>(null);
 
   // Auto-scroll effect
   useEffect(() => {
@@ -45,7 +47,7 @@ function LivePage() {
         if (Array.isArray(data)) setTranscripts(data);
       })
       .catch(() => {});
-    const eventSource = new EventSource(`/api/stream?share_code=${shareCode}`);
+    const eventSource = new EventSource(`/api/stream?share_code=${shareCode}&lang=${selectedLang}`);
 
     eventSource.onmessage = (event) => {
       try {
@@ -57,13 +59,15 @@ function LivePage() {
             original_text: data.original_text,
             translations: data.translations || {}
           });
+          interimRef.current = { original_text: data.original_text, translations: data.translations || {} };
         } else if (data.id) {
           if (data.type === "final_draft" || data.type === "final_verified") {
             // Merge last interim text so we never have an empty translation gap
-            if (data.type === "final_draft" && interimTranscript) {
-              data.translations = { ...interimTranscript.translations, ...(data.translations || {}) };
+            if (data.type === "final_draft" && interimRef.current) {
+              data.translations = { ...interimRef.current.translations, ...(data.translations || {}) };
             }
             setInterimTranscript(null); // clear interim when final arrives
+            interimRef.current = null;
           }
           
           setTranscripts((prev) => {
@@ -91,7 +95,7 @@ function LivePage() {
     return () => {
       eventSource.close();
     };
-  }, [shareCode]);
+  }, [shareCode, selectedLang]);
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
@@ -103,20 +107,9 @@ function LivePage() {
             onChange={(e) => setSelectedLang(e.target.value)}
             className="rounded-md border border-border bg-card px-3 py-1.5 text-sm"
           >
-            {[
-              { code: "FR", label: "Français", match: "fr" },
-              { code: "EN", label: "English", match: "en" },
-              { code: "AR", label: "العربية", match: "ar" },
-              { code: "FA", label: "Farsi / فارسی", match: "fa" },
-              { code: "UR", label: "Urdu / اردو", match: "ur" },
-              { code: "HI", label: "Hindi / हिन्दी", match: "hi" }
-            ].map(lang => {
-              const isOriginal = sourceLang.toLowerCase().startsWith(lang.match);
-              return (
-                <option key={lang.code} value={isOriginal ? "ORIGINAL" : lang.code}>
-                  {lang.label} {isOriginal ? "(Original)" : ""}
-                </option>
-              );
+            {SUPPORTED_LANGUAGES.map((l) => {
+              const isOrig = sourceLang.toLowerCase().startsWith(l.match);
+              return <option key={l.code} value={l.code.toUpperCase()}>{l.label} {isOrig ? "(Original)" : ""}</option>
             })}
           </select>
           <div className="flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-xs">
@@ -136,22 +129,25 @@ function LivePage() {
               {isConnected ? "Waiting for the speaker..." : "Connecting to stream..."}
             </div>
           ) : (
-            transcripts.map((t) => (
-              <div key={t.id} className="animate-in fade-in slide-in-from-bottom-2">
-                <div className={`text-2xl font-medium leading-relaxed md:text-4xl transition-colors duration-500 ${t.is_final === false ? 'text-muted-foreground' : 'text-foreground'}`}>
-                  {selectedLang === "ORIGINAL" ? t.original_text : (t.translations?.[selectedLang] || t.original_text)}
-                  {t.is_final === false && (
-                    <span className="ml-3 inline-block h-2 w-2 rounded-full bg-primary/40 animate-pulse align-middle" title="Vérification IA en cours..." />
-                  )}
+            transcripts.map((t) => {
+              const isOrig = sourceLang.toLowerCase().startsWith(selectedLang.toLowerCase());
+              return (
+                <div key={t.id} className="animate-in fade-in slide-in-from-bottom-2">
+                  <div className={`text-2xl font-medium leading-relaxed md:text-4xl transition-colors duration-500 ${t.is_final === false ? 'text-muted-foreground' : 'text-foreground'}`}>
+                    {isOrig ? t.original_text : (t.translations?.[selectedLang] || t.original_text)}
+                    {t.is_final === false && (
+                      <span className="ml-3 inline-block h-2 w-2 rounded-full bg-primary/40 animate-pulse align-middle" title="Vérification IA en cours..." />
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
           
           {interimTranscript && (
             <div className="animate-in fade-in slide-in-from-bottom-2">
               <div className="text-2xl font-medium leading-relaxed md:text-4xl text-muted-foreground/60 italic">
-                {selectedLang === "ORIGINAL" ? interimTranscript.original_text : (interimTranscript.translations?.[selectedLang] || interimTranscript.original_text)}
+                {sourceLang.toLowerCase().startsWith(selectedLang.toLowerCase()) ? interimTranscript.original_text : (interimTranscript.translations?.[selectedLang] || interimTranscript.original_text)}
                 <span className="ml-2 animate-pulse">...</span>
               </div>
             </div>

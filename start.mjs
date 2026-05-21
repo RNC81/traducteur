@@ -247,7 +247,15 @@ async function handleAddInterimTranscript(req, res) {
   const session = await Session.findOne({ share_code });
   if (!session) return json(res, 404, { error: "Session introuvable." });
   
-  const targetLangs = session.target_langs || ["FR", "AR", "EN", "FA", "UR", "HI"];
+  // LAZY TRANSLATION: Only translate to languages actively requested by connected clients
+  const clientsMap = sseClients.get(share_code);
+  const activeLangs = clientsMap ? Array.from(new Set(clientsMap.values())) : [];
+  
+  if (activeLangs.length === 0) {
+    return json(res, 200, { success: true, skipped_translation: true });
+  }
+
+  const targetLangs = activeLangs;
   
   // Use google-translate-api-x for fast free unlimited word-by-word
   let translations = {};
@@ -270,7 +278,7 @@ async function handleAddInterimTranscript(req, res) {
       original_text,
       translations
     });
-    sessionClients.forEach((send) => send(`data: ${msg}\n\n`));
+    sessionClients.forEach((_, send) => send(`data: ${msg}\n\n`));
   }
 
   return json(res, 200, { success: true });
@@ -289,12 +297,15 @@ async function handleAddTranscript(req, res) {
   if (!session) return json(res, 404, { error: "Session introuvable. Créez d'abord une session." });
   if (session.owner.toString() !== payload.userId) return json(res, 403, { error: "Non autorisé." });
 
-  // 1. FAST DRAFT (using Google Translate for instantaneous zero-flicker rendering)
-  const targetLangs = session.target_langs || ["FR", "AR", "EN", "FA", "UR", "HI"];
+  // LAZY TRANSLATION: Only translate to languages actively requested by connected clients
+  const clientsMap = sseClients.get(share_code);
+  const activeLangs = clientsMap ? Array.from(new Set(clientsMap.values())) : (session.target_langs || []);
+
+  // 1. FAST DRAFT (using Google Translate)
   const draftTranslations = {};
   
   try {
-    const promises = targetLangs.map(async (lang) => {
+    const promises = activeLangs.map(async (lang) => {
       const gLang = lang.toLowerCase();
       const result = await translateGoogle(original_text, { to: gLang });
       return { lang: lang.toUpperCase(), text: result.text };
@@ -327,35 +338,37 @@ async function handleAddTranscript(req, res) {
       is_final: transcript.is_final,
       timestamp: transcript.timestamp,
     });
-    sessionClients.forEach((send) => send(`data: ${msg}\n\n`));
+    sessionClients.forEach((_, send) => send(`data: ${msg}\n\n`));
   }
 
   // 2. BACKGROUND VERIFICATION
-  verifyTranslation(original_text, safeTranslations, session.context, targetLangs).then(async (rawFinal) => {
-    const finalTranslations = { ...safeTranslations };
-    for (const [k, v] of Object.entries(rawFinal || {})) {
-      if (v && typeof v === "string" && v.trim() !== "") {
-        finalTranslations[k.toUpperCase()] = v;
+  if (activeLangs.length > 0) {
+    verifyTranslation(original_text, safeTranslations, session.context, activeLangs).then(async (rawFinal) => {
+      const finalTranslations = { ...safeTranslations };
+      for (const [k, v] of Object.entries(rawFinal || {})) {
+        if (v && typeof v === "string" && v.trim() !== "") {
+          finalTranslations[k.toUpperCase()] = v;
+        }
       }
-    }
 
-    transcript.translations = finalTranslations;
-    transcript.is_final = true;
-    await transcript.save();
+      transcript.translations = finalTranslations;
+      transcript.is_final = true;
+      await transcript.save();
 
-    const verifiedSessionClients = sseClients.get(share_code);
-    if (verifiedSessionClients) {
-      const finalMsg = JSON.stringify({
-        type: "final_verified",
-        id: transcript._id.toString(),
-        original_text: transcript.original_text,
-        translations: finalTranslations,
-        is_final: true,
-        timestamp: transcript.timestamp,
-      });
-      verifiedSessionClients.forEach((send) => send(`data: ${finalMsg}\n\n`));
-    }
-  });
+      const verifiedSessionClients = sseClients.get(share_code);
+      if (verifiedSessionClients) {
+        const finalMsg = JSON.stringify({
+          type: "final_verified",
+          id: transcript._id.toString(),
+          original_text: transcript.original_text,
+          translations: finalTranslations,
+          is_final: true,
+          timestamp: transcript.timestamp,
+        });
+        verifiedSessionClients.forEach((_, send) => send(`data: ${finalMsg}\n\n`));
+      }
+    });
+  }
 
   return json(res, 200, { success: true });
 }
@@ -512,6 +525,8 @@ function handleStream(req, res) {
     return;
   }
 
+  const lang = url.searchParams.get("lang")?.toUpperCase() || "FR";
+
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache",
@@ -522,8 +537,8 @@ function handleStream(req, res) {
   const send = (data) => res.write(data);
   send(`data: ${JSON.stringify({ type: "connected" })}\n\n`);
 
-  if (!sseClients.has(share_code)) sseClients.set(share_code, new Set());
-  sseClients.get(share_code).add(send);
+  if (!sseClients.has(share_code)) sseClients.set(share_code, new Map());
+  sseClients.get(share_code).set(send, lang);
 
   // Heartbeat every 20s to keep connection alive
   const heartbeat = setInterval(() => res.write(": ping\n\n"), 20_000);
