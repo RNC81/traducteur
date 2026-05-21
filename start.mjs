@@ -317,9 +317,9 @@ async function handleAddTranscript(req, res) {
     is_final: false,
   });
 
-  const safeTranslations = transcript.translations instanceof Map 
-    ? Object.fromEntries(transcript.translations.entries()) 
-    : transcript.translations;
+  // Convert Mongoose Document to plain JS object to properly serialize Maps
+  const plainTranscript = transcript.toJSON();
+  const safeTranslations = plainTranscript.translations || {};
 
   // Broadcast Draft
   const sessionClients = sseClients.get(share_code);

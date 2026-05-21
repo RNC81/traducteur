@@ -88,7 +88,7 @@ function LivePage() {
             transcripts.map((t) => (
               <div key={t.id} className="animate-in fade-in slide-in-from-bottom-2">
                 <div className={`text-2xl font-medium leading-relaxed md:text-4xl transition-colors duration-500 ${t.is_final === false ? 'text-muted-foreground' : 'text-foreground'}`}>
-                  {selectedLang === "EN" ? t.original_text : t.translations[selectedLang]}
+                  {selectedLang === "EN" ? t.original_text : (t.translations?.[selectedLang] || <span className="italic text-muted-foreground">Traduction en cours...</span>)}
                   {t.is_final === false && (
                     <span className="ml-3 inline-block h-2 w-2 rounded-full bg-primary/40 animate-pulse align-middle" title="Vérification IA en cours..." />
                   )}
