@@ -115,6 +115,17 @@ function TranslatePage() {
 
     recognition.onerror = (event: any) => {
       console.error("Speech error:", event.error);
+      if (event.error === "not-allowed") {
+        toast.error("Accès au microphone refusé. Vérifiez les paramètres de confidentialité de votre ordinateur/navigateur.");
+        setIsLive(false);
+        isLiveRef.current = false;
+      } else if (event.error === "audio-capture") {
+        toast.error("Aucun microphone détecté ou le micro est utilisé par une autre application.");
+        setIsLive(false);
+        isLiveRef.current = false;
+      } else if (event.error === "network") {
+        toast.error("Erreur réseau avec les serveurs de reconnaissance vocale.");
+      }
     };
 
     recognition.onend = () => {
