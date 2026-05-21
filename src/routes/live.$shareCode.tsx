@@ -65,9 +65,12 @@ function LivePage() {
             }
             setInterimTranscript(null); // clear interim when final arrives
           }
+          
           setTranscripts((prev) => {
             const index = prev.findIndex((t) => t.id === data.id);
             if (index >= 0) {
+              // Protect existing translations if the new data has missing ones
+              data.translations = { ...prev[index].translations, ...(data.translations || {}) };
               const newArr = [...prev];
               newArr[index] = data;
               return newArr;

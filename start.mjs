@@ -328,9 +328,11 @@ async function handleAddTranscript(req, res) {
 
   // 2. BACKGROUND VERIFICATION
   verifyTranslation(original_text, safeTranslations, session.context, targetLangs).then(async (rawFinal) => {
-    const finalTranslations = {};
+    const finalTranslations = { ...safeTranslations };
     for (const [k, v] of Object.entries(rawFinal || {})) {
-      finalTranslations[k.toUpperCase()] = v;
+      if (v && typeof v === "string" && v.trim() !== "") {
+        finalTranslations[k.toUpperCase()] = v;
+      }
     }
 
     transcript.translations = finalTranslations;
