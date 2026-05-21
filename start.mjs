@@ -285,14 +285,20 @@ async function handleAddTranscript(req, res) {
   if (!session) return json(res, 404, { error: "Session introuvable. Créez d'abord une session." });
   if (session.owner.toString() !== payload.userId) return json(res, 403, { error: "Non autorisé." });
 
-  // 1. FAST DRAFT
+  // 1. FAST DRAFT (using Google Translate for instantaneous zero-flicker rendering)
   const targetLangs = session.target_langs || ["FR", "AR", "EN"];
-  const rawDraft = await translateFast(original_text, session.context, targetLangs);
-  
-  // Normalize keys to uppercase (LLMs often return lowercase keys)
   const draftTranslations = {};
-  for (const [k, v] of Object.entries(rawDraft || {})) {
-    draftTranslations[k.toUpperCase()] = v;
+  
+  try {
+    const promises = targetLangs.map(async (lang) => {
+      const gLang = lang.toLowerCase();
+      const result = await translateGoogle(original_text, { to: gLang });
+      return { lang: lang.toUpperCase(), text: result.text };
+    });
+    const results = await Promise.all(promises);
+    results.forEach(r => { draftTranslations[r.lang] = r.text; });
+  } catch (err) {
+    console.error("Fast draft translation error:", err);
   }
 
   let transcript = await Transcript.create({
