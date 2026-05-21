@@ -9,6 +9,7 @@ type TranscriptLine = {
   id: string;
   original_text: string;
   translations: Record<string, string>;
+  is_final?: boolean;
   timestamp: string;
 };
 
@@ -27,12 +28,19 @@ function LivePage() {
         if (data.type === "connected") {
           setIsConnected(true);
         } else if (data.id) {
-          setTranscripts((prev) => [...prev, data]);
+          setTranscripts((prev) => {
+            const index = prev.findIndex((t) => t.id === data.id);
+            if (index >= 0) {
+              const newArr = [...prev];
+              newArr[index] = data;
+              return newArr;
+            }
+            return [...prev, data];
+          });
           // Auto-scroll logic could go here
         }
       } catch (err) {
-        // Ignore keep-alive comments which don't trigger onmessage anyway,
-        // but catch any malformed JSON just in case.
+        // Ignore keep-alive
       }
     };
 
@@ -48,7 +56,7 @@ function LivePage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      <header className="flex h-16 items-center justify-between border-b border-border px-6">
+      <header className="flex h-16 items-center justify-between border-b border-border px-6 sticky top-0 bg-background/80 backdrop-blur-md z-10">
         <Logo />
         <div className="flex items-center gap-4">
           <select 
@@ -71,16 +79,19 @@ function LivePage() {
       </header>
 
       <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col p-6">
-        <div className="flex-1 space-y-6">
+        <div className="flex-1 space-y-8">
           {transcripts.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-muted-foreground italic">
-              {isConnected ? "Waiting for speaker..." : "Connecting to stream..."}
+            <div className="flex h-full items-center justify-center text-muted-foreground italic mt-20">
+              {isConnected ? "Waiting for the speaker..." : "Connecting to stream..."}
             </div>
           ) : (
             transcripts.map((t) => (
               <div key={t.id} className="animate-in fade-in slide-in-from-bottom-2">
-                <div className="text-2xl font-medium leading-relaxed md:text-4xl text-foreground">
+                <div className={`text-2xl font-medium leading-relaxed md:text-4xl transition-colors duration-500 ${t.is_final === false ? 'text-muted-foreground' : 'text-foreground'}`}>
                   {selectedLang === "EN" ? t.original_text : t.translations[selectedLang]}
+                  {t.is_final === false && (
+                    <span className="ml-3 inline-block h-2 w-2 rounded-full bg-primary/40 animate-pulse align-middle" title="Vérification IA en cours..." />
+                  )}
                 </div>
               </div>
             ))

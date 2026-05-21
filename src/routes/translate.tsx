@@ -15,6 +15,9 @@ function TranslatePage() {
   const recognitionRef = useRef<any>(null);
   const isLiveRef = useRef(false);
 
+  const [context, setContext] = useState("");
+  const [sourceLang, setSourceLang] = useState("fr-FR");
+
   useEffect(() => {
     fetch("/api/auth/me")
       .then((r) => r.json())
@@ -36,7 +39,12 @@ function TranslatePage() {
       const res = await fetch("/api/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: "Session Live", mode: "live" }),
+        body: JSON.stringify({ 
+          title: "Session Live", 
+          mode: "live",
+          source_lang: sourceLang,
+          context: context
+        }),
       });
       if (!res.ok) throw new Error("Erreur de création de session");
       const data = await res.json();
@@ -61,7 +69,7 @@ function TranslatePage() {
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = "fr-FR";
+    recognition.lang = sourceLang;
 
     recognition.onresult = async (event: any) => {
       let interim = "";
@@ -133,12 +141,41 @@ function TranslatePage() {
             </p>
           </div>
         ) : (
-          <div className="flex flex-col items-center">
-            <div className="mb-8 flex items-center justify-center rounded-full bg-primary/10 p-6">
-              <Mic className="h-16 w-16 text-primary" />
+          <div className="flex w-full max-w-md flex-col items-center rounded-xl border border-border bg-card p-8 shadow-sm">
+            <div className="mb-6 flex items-center justify-center rounded-full bg-primary/10 p-5">
+              <Mic className="h-12 w-12 text-primary" />
             </div>
-            <h2 className="text-2xl font-medium">Prêt à démarrer ?</h2>
-            <p className="mt-2 text-muted-foreground">Commencez à parler pour diffuser les traductions.</p>
+            <h2 className="font-display text-2xl font-medium">Configurer la session</h2>
+            
+            <div className="mt-6 w-full space-y-4 text-left">
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-foreground">Langue parlée</label>
+                <select
+                  value={sourceLang}
+                  onChange={(e) => setSourceLang(e.target.value)}
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                >
+                  <option value="fr-FR">Français</option>
+                  <option value="en-US">Anglais</option>
+                  <option value="ar-SA">Arabe</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-foreground">
+                  Contexte <span className="text-muted-foreground font-normal">(Optionnel)</span>
+                </label>
+                <textarea
+                  value={context}
+                  onChange={(e) => setContext(e.target.value)}
+                  placeholder="Ex: Khutbah sur l'importance du mois de Ramadan et l'Imam Ali..."
+                  className="h-24 w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
+                />
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  Aide l'IA à comprendre les termes techniques ou théologiques.
+                </p>
+              </div>
+            </div>
           </div>
         )}
 
