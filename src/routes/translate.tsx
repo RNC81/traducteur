@@ -15,6 +15,8 @@ function TranslatePage() {
   const recognitionRef = useRef<any>(null);
   const isLiveRef = useRef(false);
 
+  const interimRef = useRef("");
+  const lastSentInterimRef = useRef("");
   const [context, setContext] = useState("");
   const [sourceLang, setSourceLang] = useState("fr-FR");
 
@@ -28,6 +30,7 @@ function TranslatePage() {
   const toggleLive = async () => {
     if (isLive) {
       recognitionRef.current?.stop();
+      if ((window as any).interimInterval) clearInterval((window as any).interimInterval);
       isLiveRef.current = false;
       setIsLive(false);
       toast.success("Session terminée.");
@@ -72,6 +75,19 @@ function TranslatePage() {
     recognition.interimResults = true;
     recognition.lang = sourceLang;
 
+    // Send interim text every 800ms to avoid flooding the API
+    (window as any).interimInterval = setInterval(() => {
+      const current = interimRef.current;
+      if (current && current !== lastSentInterimRef.current) {
+        lastSentInterimRef.current = current;
+        fetch("/api/transcripts/interim", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ share_code: newCode, original_text: current }),
+        }).catch(() => {});
+      }
+    }, 800);
+
     recognition.onresult = async (event: any) => {
       let interim = "";
       let final = "";
@@ -79,8 +95,11 @@ function TranslatePage() {
         if (event.results[i].isFinal) final += event.results[i][0].transcript;
         else interim += event.results[i][0].transcript;
       }
+      interimRef.current = interim;
       setInterimText(interim);
+      
       if (final) {
+        interimRef.current = ""; // Clear interim when final triggers
         setFinalTexts((prev) => [...prev, { id: Date.now(), text: final }]);
         try {
           await fetch("/api/transcripts", {
@@ -99,7 +118,11 @@ function TranslatePage() {
     };
 
     recognition.onend = () => {
-      if (isLiveRef.current) recognition.start();
+      if (isLiveRef.current) {
+        recognition.start();
+      } else {
+        if ((window as any).interimInterval) clearInterval((window as any).interimInterval);
+      }
     };
 
     recognition.start();

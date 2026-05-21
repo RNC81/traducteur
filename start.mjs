@@ -16,6 +16,9 @@ import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { parse as parseCookies, serialize as serializeCookie } from "cookie";
+import fs from "fs";
+import { URL } from "url";
+import translateGoogle from "google-translate-api-x";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const DIST_CLIENT = join(__dirname, "dist", "client");
@@ -179,7 +182,7 @@ async function verifyTranslation(originalText, draftTranslations, contextStr, ta
   if (!openaiKey && !mistralKey) return draftTranslations; // No verifier available
 
   const contextPrompt = contextStr ? ` Le contexte de ce discours est : "${contextStr}".` : "";
-  const prompt = `Vous êtes un relecteur expert. Voici un texte original en langue source et sa traduction automatique préliminaire dans [${targetLangs.join(", ")}].${contextPrompt} Corrigez les erreurs de sens, les contresens, et assurez-vous que le vocabulaire est parfaitement adapté au contexte (notamment théologique si applicable). Renvoyez UNIQUEMENT un objet JSON valide avec les codes de langue comme clés et les traductions corrigées comme valeurs.`;
+  const prompt = `Vous êtes un relecteur expert. Voici un texte original en langue source et sa traduction automatique préliminaire dans [${targetLangs.join(", ")}].${contextPrompt} Corrigez les erreurs de sens, les contresens, et assurez-vous que le vocabulaire est parfaitement adapté au contexte (notamment théologique si applicable). Renvoyez UNIQUEMENT un objet JSON valide avec les codes de langue comme clés et les traductions corrigées comme valeurs. Conservez bien toutes les clés de langue demandées.`;
   
   const userMessage = `Texte original : "${originalText}"\nTraductions préliminaires : ${JSON.stringify(draftTranslations)}`;
 
@@ -226,7 +229,113 @@ async function verifyTranslation(originalText, draftTranslations, contextStr, ta
   }
 }
 
-// ─── API ROUTE HANDLERS ───────────────────────────────────────────────────────
+// ─── API HANDLERS ────────────────────────────────────────────────────────────
+
+/** POST /api/transcripts/interim — ultra-fast word-by-word translation */
+async function handleAddInterimTranscript(req, res) {
+  const payload = getUserFromCookie(req);
+  if (!payload) return json(res, 401, { error: "Non authentifié." });
+
+  const { share_code, original_text } = await readBody(req);
+  if (!share_code || !original_text) return json(res, 400, { error: "share_code et original_text requis." });
+
+  await connectDB();
+  const session = await Session.findOne({ share_code });
+  if (!session) return json(res, 404, { error: "Session introuvable." });
+  
+  const targetLangs = session.target_langs || ["FR", "AR"];
+  
+  // Use google-translate-api-x for fast free unlimited word-by-word
+  let translations = {};
+  try {
+    const promises = targetLangs.map(async (lang) => {
+      const gLang = lang.toLowerCase();
+      const result = await translateGoogle(original_text, { to: gLang });
+      return { lang, text: result.text };
+    });
+    const results = await Promise.all(promises);
+    results.forEach(r => { translations[r.lang] = r.text; });
+  } catch (err) {
+    console.error("Interim translation error:", err);
+  }
+
+  const sessionClients = sseClients.get(share_code);
+  if (sessionClients) {
+    const msg = JSON.stringify({
+      type: "interim",
+      original_text,
+      translations
+    });
+    sessionClients.forEach((send) => send(`data: ${msg}\n\n`));
+  }
+
+  return json(res, 200, { success: true });
+}
+
+/** POST /api/transcripts — add transcript and broadcast via SSE */
+async function handleAddTranscript(req, res) {
+  const payload = getUserFromCookie(req);
+  if (!payload) return json(res, 401, { error: "Non authentifié." });
+
+  const { share_code, original_text } = await readBody(req);
+  if (!share_code || !original_text) return json(res, 400, { error: "share_code et original_text requis." });
+
+  await connectDB();
+  const session = await Session.findOne({ share_code });
+  if (!session) return json(res, 404, { error: "Session introuvable. Créez d'abord une session." });
+  if (session.owner.toString() !== payload.userId) return json(res, 403, { error: "Non autorisé." });
+
+  // 1. FAST DRAFT
+  const targetLangs = session.target_langs || ["FR", "AR"];
+  const draftTranslations = await translateFast(original_text, session.context, targetLangs);
+
+  let transcript = await Transcript.create({
+    session_id: session._id,
+    original_text,
+    translations: draftTranslations,
+    is_final: false,
+  });
+
+  // Convert Mongoose Document to plain JS object to properly serialize Maps
+  const plainTranscript = transcript.toJSON();
+  const safeTranslations = plainTranscript.translations || {};
+
+  // Broadcast Draft
+  const sessionClients = sseClients.get(share_code);
+  if (sessionClients) {
+    const msg = JSON.stringify({
+      type: "final_draft",
+      id: transcript._id.toString(),
+      original_text: transcript.original_text,
+      translations: safeTranslations,
+      is_final: transcript.is_final,
+      timestamp: transcript.timestamp,
+    });
+    sessionClients.forEach((send) => send(`data: ${msg}\n\n`));
+  }
+
+  // 2. BACKGROUND VERIFICATION
+  verifyTranslation(original_text, safeTranslations, session.context, targetLangs).then(async (finalTranslations) => {
+    transcript.translations = finalTranslations;
+    transcript.is_final = true;
+    await transcript.save();
+
+    const verifiedSessionClients = sseClients.get(share_code);
+    if (verifiedSessionClients) {
+      const finalMsg = JSON.stringify({
+        type: "final_verified",
+        id: transcript._id.toString(),
+        original_text: transcript.original_text,
+        translations: finalTranslations,
+        is_final: true,
+        timestamp: transcript.timestamp,
+      });
+      verifiedSessionClients.forEach((send) => send(`data: ${finalMsg}\n\n`));
+    }
+  });
+
+  return json(res, 200, { success: true });
+}
 
 /** POST /api/auth — sign up or sign in */
 async function handleAuth(req, res) {
@@ -270,8 +379,55 @@ function handleSignout(req, res) {
   return json(res, 200, { success: true });
 }
 
-/** GET /api/sessions */
-async function handleGetSessions(req, res) {
+/** GET /api/sessions/:share_code — get session info */
+async function handleGetSessionInfo(req, res, share_code) {
+  await connectDB();
+  const session = await Session.findOne({ share_code });
+  if (!session) return json(res, 404, { error: "Session non trouvée" });
+  return json(res, 200, session);
+}
+
+/** GET /api/sessions/:share_code/transcripts — get history */
+async function handleGetSessionTranscripts(req, res, share_code) {
+  await connectDB();
+  const session = await Session.findOne({ share_code });
+  if (!session) return json(res, 404, { error: "Session non trouvée" });
+
+  const transcripts = await Transcript.find({ session_id: session._id }).sort({ timestamp: 1 });
+  
+  const formatted = transcripts.map(t => {
+    const plain = t.toJSON();
+    return {
+      type: plain.is_final ? "final_verified" : "final_draft",
+      id: plain._id.toString(),
+      original_text: plain.original_text,
+      translations: plain.translations || {},
+      is_final: plain.is_final,
+      timestamp: plain.timestamp
+    };
+  });
+
+  return json(res, 200, formatted);
+}
+
+/** DELETE /api/sessions/:id — delete session and its transcripts */
+async function handleDeleteSession(req, res, id) {
+  const payload = getUserFromCookie(req);
+  if (!payload) return json(res, 401, { error: "Non authentifié." });
+
+  await connectDB();
+  const session = await Session.findById(id);
+  if (!session) return json(res, 404, { error: "Session non trouvée." });
+  if (session.owner.toString() !== payload.userId) return json(res, 403, { error: "Non autorisé." });
+
+  await Transcript.deleteMany({ session_id: session._id });
+  await Session.findByIdAndDelete(id);
+
+  return json(res, 200, { success: true });
+}
+
+/** GET /api/sessions — list my sessions */
+async function handleListSessions(req, res) {
   const payload = getUserFromCookie(req);
   if (!payload) return json(res, 401, { error: "Non authentifié." });
 
@@ -291,69 +447,6 @@ async function handleGetSessions(req, res) {
     started_at: s.started_at?.toISOString(),
     ended_at: s.ended_at?.toISOString() || null,
   })));
-}
-
-/** POST /api/transcripts — add transcript and broadcast via SSE */
-async function handleAddTranscript(req, res) {
-  const payload = getUserFromCookie(req);
-  if (!payload) return json(res, 401, { error: "Non authentifié." });
-
-  const { share_code, original_text } = await readBody(req);
-  if (!share_code || !original_text) return json(res, 400, { error: "share_code et original_text requis." });
-
-  await connectDB();
-  const session = await Session.findOne({ share_code });
-  if (!session) return json(res, 404, { error: "Session introuvable. Créez d'abord une session." });
-  if (session.owner.toString() !== payload.userId) return json(res, 403, { error: "Non autorisé." });
-
-  // 1. FAST DRAFT
-  const targetLangs = session.target_langs || ["FR", "AR"];
-  const draftTranslations = await translateFast(original_text, session.context, targetLangs);
-
-  let transcript = await Transcript.create({
-    session_id: session._id,
-    original_text,
-    translations: draftTranslations,
-    is_final: false,
-  });
-
-  // Convert Mongoose Document to plain JS object to properly serialize Maps
-  const plainTranscript = transcript.toJSON();
-  const safeTranslations = plainTranscript.translations || {};
-
-  // Broadcast Draft
-  const sessionClients = sseClients.get(share_code);
-  if (sessionClients) {
-    const msg = JSON.stringify({
-      id: transcript._id.toString(),
-      original_text: transcript.original_text,
-      translations: safeTranslations,
-      is_final: transcript.is_final,
-      timestamp: transcript.timestamp,
-    });
-    sessionClients.forEach((send) => send(`data: ${msg}\n\n`));
-  }
-
-  // 2. BACKGROUND VERIFICATION
-  verifyTranslation(original_text, safeTranslations, session.context, targetLangs).then(async (finalTranslations) => {
-    transcript.translations = finalTranslations;
-    transcript.is_final = true;
-    await transcript.save();
-
-    const verifiedSessionClients = sseClients.get(share_code);
-    if (verifiedSessionClients) {
-      const finalMsg = JSON.stringify({
-        id: transcript._id.toString(),
-        original_text: transcript.original_text,
-        translations: finalTranslations,
-        is_final: true,
-        timestamp: transcript.timestamp,
-      });
-      verifiedSessionClients.forEach((send) => send(`data: ${finalMsg}\n\n`));
-    }
-  });
-
-  return json(res, 200, { success: true });
 }
 
 /** POST /api/sessions — create a new live session */
@@ -496,20 +589,39 @@ async function sendWebResponse(webRes, res) {
 
 // ─── MAIN SERVER ─────────────────────────────────────────────────────────────
 const httpServer = createServer(async (req, res) => {
-  const rawPath = decodeURIComponent(new URL(req.url, "http://x").pathname);
+  const urlObj = new URL(req.url, "http://x");
+  const pathname = decodeURIComponent(urlObj.pathname);
 
   try {
     // ── API Routes (handled directly — no TanStack Start RPC) ──
-    if (rawPath === "/api/auth" && req.method === "POST") return handleAuth(req, res);
-    if (rawPath === "/api/auth/me" && req.method === "GET") return handleMe(req, res);
-    if (rawPath === "/api/auth/signout" && req.method === "POST") return handleSignout(req, res);
-    if (rawPath === "/api/sessions" && req.method === "GET") return handleGetSessions(req, res);
-    if (rawPath === "/api/sessions" && req.method === "POST") return handleCreateSession(req, res);
-    if (rawPath === "/api/transcripts" && req.method === "POST") return handleAddTranscript(req, res);
-    if (rawPath === "/api/stream" && req.method === "GET") return handleStream(req, res);
+    if (req.method === "POST" && pathname === "/api/auth") return handleAuth(req, res);
+    if (req.method === "GET" && pathname === "/api/auth/me") return handleMe(req, res);
+    if (req.method === "POST" && pathname === "/api/auth/signout") return handleSignout(req, res);
+    if (req.method === "POST" && pathname === "/api/transcripts/interim") {
+      return handleAddInterimTranscript(req, res);
+    }
+    if (req.method === "POST" && pathname === "/api/transcripts") {
+      return handleAddTranscript(req, res);
+    }
+    if (req.method === "POST" && pathname === "/api/sessions") {
+      return handleCreateSession(req, res);
+    }
+    if (req.method === "GET" && pathname.match(/^\/api\/sessions\/([^/]+)\/transcripts$/)) {
+      return handleGetSessionTranscripts(req, res, pathname.split("/")[3]);
+    }
+    if (req.method === "GET" && pathname.match(/^\/api\/sessions\/([^/]+)$/)) {
+      return handleGetSessionInfo(req, res, pathname.split("/")[3]);
+    }
+    if (req.method === "DELETE" && pathname.match(/^\/api\/sessions\/([^/]+)$/)) {
+      return handleDeleteSession(req, res, pathname.split("/")[3]);
+    }
+    if (req.method === "GET" && pathname === "/api/sessions") {
+      return handleListSessions(req, res);
+    }
+    if (req.method === "GET" && pathname === "/api/stream") return handleStream(req, res);
 
     // ── Static files ──
-    const staticPath = join(DIST_CLIENT, rawPath);
+    const staticPath = join(DIST_CLIENT, pathname);
     if (existsSync(staticPath) && statSync(staticPath).isFile()) {
       const ext = extname(staticPath).toLowerCase();
       res.writeHead(200, {

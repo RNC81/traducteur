@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/Logo";
-import { LogOut, Mic, Sparkles, Radio, ChevronRight } from "lucide-react";
+import { LogOut, Mic, Sparkles, Radio, ChevronRight, Trash2, Eye } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard")({ component: Dashboard });
 
@@ -47,6 +47,18 @@ function Dashboard() {
   const signOut = async () => {
     await fetch("/api/auth/signout", { method: "POST" });
     navigate({ to: "/" });
+  };
+
+  const deleteSession = async (id: string) => {
+    if (!confirm("Voulez-vous vraiment supprimer cette session et tout son historique ?")) return;
+    try {
+      const res = await fetch(`/api/sessions/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setSessions(prev => prev.filter(s => s.id !== id));
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   if (loading) return (
@@ -103,10 +115,10 @@ function Dashboard() {
           ) : (
             <ul className="mt-4 divide-y divide-border rounded-xl border border-border bg-card">
               {sessions.map((s) => (
-                <li key={s.id} className="flex items-center justify-between gap-4 px-5 py-4">
-                  <div className="min-w-0">
+                <li key={s.id} className="flex items-center justify-between gap-4 px-5 py-4 hover:bg-muted/30">
+                  <Link to={`/live/${s.share_code}`} className="flex-1 min-w-0 group cursor-pointer block">
                     <div className="flex items-center gap-2">
-                      <span className="truncate font-medium">{s.title || "Session sans titre"}</span>
+                      <span className="truncate font-medium group-hover:text-primary transition-colors">{s.title || "Session sans titre"}</span>
                       {s.is_live && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-red-500/10 px-1.5 py-0.5 text-[10px] text-red-600">
                           <Radio className="h-2.5 w-2.5 animate-pulse" /> Live
@@ -119,8 +131,15 @@ function Dashboard() {
                     <div className="mt-0.5 truncate text-xs text-muted-foreground">
                       {new Date(s.started_at).toLocaleString("fr-FR")} · {s.source_lang} → {s.target_langs.join(", ")}
                     </div>
+                  </Link>
+                  <div className="flex items-center gap-2">
+                    <Link to={`/live/${s.share_code}`} className="p-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-md">
+                      <Eye className="h-4 w-4" />
+                    </Link>
+                    <button onClick={() => deleteSession(s.id)} className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-md">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
                   </div>
-                  <ChevronRight className="h-4 w-4 flex-none text-muted-foreground" />
                 </li>
               ))}
             </ul>
