@@ -89,7 +89,7 @@
     "format": "prettier --write .",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "vite preview"
+    "start": "node start.mjs"
   },
   "sideEffects": false,
   "type": "module"
