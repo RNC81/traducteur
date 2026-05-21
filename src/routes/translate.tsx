@@ -35,6 +35,7 @@ function TranslatePage() {
       return;
     }
 
+    let newCode = "";
     try {
       const res = await fetch("/api/sessions", {
         method: "POST",
@@ -48,7 +49,7 @@ function TranslatePage() {
       });
       if (!res.ok) throw new Error("Erreur de création de session");
       const data = await res.json();
-      const newCode = data.share_code;
+      newCode = data.share_code;
       setShareCode(newCode);
       setIsLive(true);
       isLiveRef.current = true;
