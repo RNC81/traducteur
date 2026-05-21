@@ -142,6 +142,88 @@ async function readBody(req) {
   });
 }
 
+// ─── AI TRANSLATION LOGIC ───────────────────────────────────────────────────
+let aiIndex = 0;
+
+async function translateWithAI(text, mode, targetLangs) {
+  const keys = [
+    { provider: "gemini", key: process.env.GEMINI_API_KEY },
+    { provider: "openai", key: process.env.OPENAI_API_KEY },
+    { provider: "mistral", key: process.env.MISTRAL_API_KEY },
+  ].filter((k) => k.key);
+
+  if (keys.length === 0) {
+    // Fallback if no keys are provided
+    return targetLangs.reduce((acc, lang) => ({ ...acc, [lang]: "[API Key missing] " + text }), {});
+  }
+
+  // Round robin
+  const currentApi = keys[aiIndex % keys.length];
+  aiIndex++;
+
+  const prompt = mode === "faith"
+    ? `Traduisez le texte suivant dans les langues demandées: [${targetLangs.join(", ")}]. C'est pour une audience religieuse islamique chiite (khutbah/majlis). Utilisez un vocabulaire théologique précis. Renvoyez UNIQUEMENT un objet JSON valide avec les codes de langue comme clés et les traductions comme valeurs.`
+    : `Traduisez le texte suivant dans les langues demandées: [${targetLangs.join(", ")}]. C'est pour une session live. Traduction fluide. Renvoyez UNIQUEMENT un objet JSON valide avec les codes de langue comme clés et les traductions comme valeurs.`;
+
+  const userMessage = `Texte à traduire : "${text}"`;
+
+  try {
+    let jsonResponse = "{}";
+
+    if (currentApi.provider === "gemini") {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${currentApi.key}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt + "\n\n" + userMessage }] }],
+        })
+      });
+      const data = await res.json();
+      jsonResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+    } 
+    else if (currentApi.provider === "openai") {
+      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${currentApi.key}` },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: prompt },
+            { role: "user", content: userMessage }
+          ]
+        })
+      });
+      const data = await res.json();
+      jsonResponse = data.choices?.[0]?.message?.content || "{}";
+    }
+    else if (currentApi.provider === "mistral") {
+      const res = await fetch("https://api.mistral.ai/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${currentApi.key}` },
+        body: JSON.stringify({
+          model: "mistral-small-latest",
+          response_format: { type: "json_object" },
+          messages: [
+            { role: "system", content: prompt },
+            { role: "user", content: userMessage }
+          ]
+        })
+      });
+      const data = await res.json();
+      jsonResponse = data.choices?.[0]?.message?.content || "{}";
+    }
+
+    // Clean markdown JSON blocks if AI returns them
+    jsonResponse = jsonResponse.replace(/```json/g, "").replace(/```/g, "").trim();
+    return JSON.parse(jsonResponse);
+  } catch (err) {
+    console.error(`AI Translation error with ${currentApi.provider}:`, err);
+    // Return empty translations object to avoid crashing
+    return targetLangs.reduce((acc, lang) => ({ ...acc, [lang]: "[AI Error] " + text }), {});
+  }
+}
+
 // ─── API ROUTE HANDLERS ───────────────────────────────────────────────────────
 
 /** POST /api/auth — sign up or sign in */
@@ -214,13 +296,15 @@ async function handleAddTranscript(req, res) {
   const payload = getUserFromCookie(req);
   if (!payload) return json(res, 401, { error: "Non authentifié." });
 
-  const { share_code, original_text, translations } = await readBody(req);
+  const { share_code, original_text } = await readBody(req);
   if (!share_code || !original_text) return json(res, 400, { error: "share_code et original_text requis." });
 
   await connectDB();
   const session = await Session.findOne({ share_code });
   if (!session) return json(res, 404, { error: "Session introuvable. Créez d'abord une session." });
   if (session.owner.toString() !== payload.userId) return json(res, 403, { error: "Non autorisé." });
+
+  const translations = await translateWithAI(original_text, session.mode, session.target_langs || ["FR", "AR"]);
 
   const transcript = await Transcript.create({
     session_id: session._id,

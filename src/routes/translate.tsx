@@ -73,15 +73,11 @@ function TranslatePage() {
       setInterimText(interim);
       if (final) {
         setFinalTexts((prev) => [...prev, { id: Date.now(), text: final }]);
-        const translations = {
-          FR: "Traduction simulée : " + final,
-          AR: "ترجمة وهمية: " + final,
-        };
         try {
           await fetch("/api/transcripts", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ share_code: newCode, original_text: final, translations }),
+            body: JSON.stringify({ share_code: newCode, original_text: final }),
           });
         } catch (e) {
           console.error("Failed to send transcript", e);
