@@ -4,6 +4,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { Mic, Globe2, Sparkles, ShieldCheck, BookOpen, Languages, Zap, Users, Check } from "lucide-react";
 
 import { motion, useMotionValue, useSpring, useTransform } from "framer-motion";
+import { ReactLenis } from 'lenis/react';
 
 export const Route = createFileRoute("/")({ component: Index });
 
@@ -64,14 +65,15 @@ function Phone3D() {
 
 function Index() {
   return (
-    <div className="h-screen overflow-y-scroll snap-y snap-mandatory scroll-smooth bg-background text-foreground hide-scrollbar">
+    <ReactLenis root options={{ lerp: 0.08, duration: 1.5, smoothWheel: true }}>
+      <div className="min-h-screen bg-background text-foreground">
       {/* HEADER FIXED */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50">
         <SiteNav />
       </div>
 
       {/* HERO SECTION */}
-      <section className="relative h-screen snap-center flex items-center justify-center overflow-hidden pt-16">
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-24 pb-12">
         <div className="pointer-events-none absolute inset-0 -z-10 opacity-60"
              style={{ background: "radial-gradient(60% 50% at 50% 0%, color-mix(in oklch, var(--primary) 18%, transparent), transparent 70%)" }} />
         
@@ -123,7 +125,7 @@ function Index() {
 
       {/* FEATURES */}
       {/* FEATURES SECTION */}
-      <section id="features" className="h-screen snap-center flex items-center justify-center border-t border-border/60 bg-background relative pt-16">
+      <section id="features" className="min-h-screen flex items-center justify-center border-t border-border/60 bg-background relative py-24">
         <div className="mx-auto max-w-6xl w-full px-6">
           <div className="max-w-2xl">
             <div className="text-xs font-semibold uppercase tracking-wider text-primary">Features</div>
@@ -142,7 +144,7 @@ function Index() {
       </section>
 
       {/* FAITH MODE SECTION */}
-      <section id="faith" className="h-screen snap-center flex items-center justify-center bg-stone-950 text-stone-100 relative pt-16">
+      <section id="faith" className="min-h-screen flex items-center justify-center bg-stone-950 text-stone-100 relative py-24">
         <div className="mx-auto grid max-w-6xl w-full gap-12 px-6 md:grid-cols-2 md:items-center">
           <motion.div initial={{ opacity: 0, x: -40 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300">
@@ -184,7 +186,7 @@ function Index() {
       </section>
 
       {/* USE CASES */}
-      <section className="h-screen snap-center flex items-center justify-center border-y border-border/60 bg-background relative pt-16">
+      <section className="min-h-screen flex items-center justify-center border-y border-border/60 bg-background relative py-24">
         <div className="mx-auto max-w-6xl w-full px-6">
           <div className="text-center">
             <div className="text-xs font-semibold uppercase tracking-wider text-primary">Use cases</div>
@@ -199,7 +201,7 @@ function Index() {
         </div>
       </section>
       {/* PRICING & CTA SECTION */}
-      <section id="pricing" className="h-screen snap-center flex flex-col justify-between bg-background relative pt-16">
+      <section id="pricing" className="min-h-screen flex flex-col justify-between bg-background relative pt-24">
         <div className="mx-auto max-w-6xl w-full px-6 flex-1 flex flex-col justify-center">
           <div className="text-center">
             <div className="text-xs font-semibold uppercase tracking-wider text-primary">Pricing</div>
@@ -224,7 +226,8 @@ function Index() {
           <SiteFooter />
         </div>
       </section>
-    </div>
+      </div>
+    </ReactLenis>
   );
 }
 
