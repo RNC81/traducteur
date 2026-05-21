@@ -626,7 +626,7 @@ const httpServer = createServer(async (req, res) => {
       const ext = extname(staticPath).toLowerCase();
       res.writeHead(200, {
         "Content-Type": MIME[ext] || "application/octet-stream",
-        "Cache-Control": rawPath.startsWith("/assets/")
+        "Cache-Control": pathname.startsWith("/assets/")
           ? "public, max-age=31536000, immutable"
           : "no-cache",
       });
@@ -639,7 +639,7 @@ const httpServer = createServer(async (req, res) => {
     const webRes = await ssrHandler.fetch(webReq, {}, {});
     await sendWebResponse(webRes, res);
   } catch (err) {
-    console.error("[500]", req.method, rawPath, err?.message || err);
+    console.error("[500]", req.method, pathname, err?.message || err);
     if (!res.headersSent) res.writeHead(500, { "Content-Type": "text/plain" });
     res.end("Internal Server Error");
   }
