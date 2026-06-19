@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useRef } from "react";
+import { QRCodeCanvas } from "qrcode.react";
 import { Logo } from "@/components/Logo";
-import { Mic, MicOff, Settings, Radio, MonitorPlay } from "lucide-react";
+import { Mic, MicOff, Settings, Radio, MonitorPlay, QrCode } from "lucide-react";
 import { toast } from "sonner";
 import { SUPPORTED_LANGUAGES } from "@/lib/languages";
 
@@ -12,6 +13,8 @@ function TranslatePage() {
   const [isLive, setIsLive] = useState(false);
   const [shareCode, setShareCode] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [showQR, setShowQR] = useState(false);
+  const qrRef = useRef<HTMLDivElement>(null);
   const [interimText, setInterimText] = useState("");
   const [finalTexts, setFinalTexts] = useState<{ id: number; text: string }[]>([]);
   const recognitionRef = useRef<any>(null);
@@ -28,6 +31,15 @@ function TranslatePage() {
       .then(({ user }) => { if (!user) navigate({ to: "/auth" }); })
       .catch(() => navigate({ to: "/auth" }));
   }, [navigate]);
+
+  const downloadQR = () => {
+    const canvas = qrRef.current?.querySelector("canvas");
+    if (!canvas) return;
+    const a = document.createElement("a");
+    a.href = (canvas as HTMLCanvasElement).toDataURL("image/png");
+    a.download = `verba-qr-${shareCode}.png`;
+    a.click();
+  };
 
   const copyOBSLink = () => {
     if (!shareCode) return;
@@ -169,12 +181,19 @@ function TranslatePage() {
               >
                 /live/{shareCode}
               </a>
-              <button 
+              <button
                 onClick={copyOBSLink}
                 className="ml-2 rounded-md bg-emerald-500/10 p-1.5 text-emerald-500 hover:bg-emerald-500/20 transition-colors"
                 title="Copier le lien Régie (OBS)"
               >
                 <MonitorPlay className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setShowQR(true)}
+                className="rounded-md bg-primary/10 p-1.5 text-primary hover:bg-primary/20 transition-colors"
+                title="Afficher le QR Code audience"
+              >
+                <QrCode className="h-4 w-4" />
               </button>
             </div>
           )}
@@ -183,6 +202,26 @@ function TranslatePage() {
           </button>
         </div>
       </header>
+
+      {showQR && shareCode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowQR(false)}>
+          <div className="rounded-2xl bg-card border border-border p-8 shadow-2xl flex flex-col items-center gap-6" onClick={(e) => e.stopPropagation()}>
+            <h2 className="font-display text-xl">QR Code Audience</h2>
+            <p className="text-sm text-muted-foreground">Scannez pour rejoindre la traduction en direct</p>
+            <div ref={qrRef}>
+              <QRCodeCanvas value={`${window.location.origin}/live/${shareCode}`} size={256} />
+            </div>
+            <div className="flex gap-3">
+              <button onClick={downloadQR} className="rounded-md border border-border px-4 py-2 text-sm hover:bg-accent transition-colors">
+                Télécharger PNG
+              </button>
+              <button onClick={() => setShowQR(false)} className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 transition-colors">
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <main className="flex flex-1 flex-col items-center justify-center p-6">
         {isLive ? (
