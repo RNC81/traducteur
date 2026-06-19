@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useRef } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import { Logo } from "@/components/Logo";
-import { Mic, MicOff, Settings, Radio, MonitorPlay, QrCode } from "lucide-react";
+import { Mic, MicOff, Settings, Radio, MonitorPlay, QrCode, Monitor } from "lucide-react";
 import { toast } from "sonner";
 import { SUPPORTED_LANGUAGES } from "@/lib/languages";
 
@@ -46,6 +46,13 @@ function TranslatePage() {
     const url = `${window.location.origin}/overlay/${shareCode}?lang=FR`;
     navigator.clipboard.writeText(url);
     toast.success("Lien Régie (OBS) copié !");
+  };
+
+  const copyDisplayLink = () => {
+    if (!shareCode) return;
+    const url = `${window.location.origin}/display/${shareCode}?lang=FR`;
+    navigator.clipboard.writeText(url);
+    toast.success("Lien Écran copié !");
   };
 
   const toggleLive = async () => {
@@ -194,6 +201,13 @@ function TranslatePage() {
                 title="Afficher le QR Code audience"
               >
                 <QrCode className="h-4 w-4" />
+              </button>
+              <button
+                onClick={copyDisplayLink}
+                className="rounded-md bg-violet-500/10 p-1.5 text-violet-500 hover:bg-violet-500/20 transition-colors"
+                title="Copier le lien Écran (vidéoprojecteur)"
+              >
+                <Monitor className="h-4 w-4" />
               </button>
             </div>
           )}
