@@ -204,22 +204,43 @@ function Index() {
       <section id="pricing" className="min-h-screen flex flex-col justify-between bg-background relative pt-24">
         <div className="mx-auto max-w-6xl w-full px-6 flex-1 flex flex-col justify-center">
           <div className="text-center">
-            <div className="text-xs font-semibold uppercase tracking-wider text-primary">Pricing</div>
-            <h2 className="mt-2 font-display text-4xl md:text-5xl">Simple, fair, scalable.</h2>
+            <div className="text-xs font-semibold uppercase tracking-wider text-primary">Tarifs</div>
+            <h2 className="mt-2 font-display text-4xl md:text-5xl">Simple, transparent, évolutif.</h2>
           </div>
           <div className="mt-10 grid gap-6 md:grid-cols-3">
-            <Plan name="Free" price="$0" desc="Try Verba live with short sessions." features={["30 min / month", "Up to 5 audience listeners", "12 languages", "Web access"]} />
-            <Plan featured name="Pro" price="$19" desc="For creators, teachers, and speakers." features={["Unlimited sessions", "Up to 100 listeners", "80+ languages", "Faith Mode", "Export transcripts"]} />
-            <Plan name="Organization" price="Custom" desc="For mosques, institutes, and enterprises." features={["Unlimited listeners", "Custom branding", "Priority models", "SSO & admin", "Dedicated support"]} />
+            <Plan
+              name="Free"
+              desc="Testez Verba en conditions réelles."
+              features={["30 min / mois", "5 spectateurs max", "1 langue simultanée", "Accès web"]}
+              ctaLabel="Commencer gratuitement"
+              ctaHref="/auth"
+            />
+            <Plan
+              featured
+              name="Pro"
+              price="69€"
+              desc="Pour les créateurs, enseignants et orateurs."
+              features={["Sessions illimitées", "3 langues simultanées", "100 spectateurs max", "Mode Religieux", "Export des transcriptions"]}
+              ctaLabel="Commencer"
+              ctaHref="/auth"
+            />
+            <Plan
+              name="Enterprise"
+              price="Sur devis"
+              desc="Pour les mosquées, instituts et grandes organisations."
+              features={["Langues illimitées", "Spectateurs illimités", "Glossaire sur-mesure", "Marque personnalisée", "Support dédié"]}
+              ctaLabel="Nous contacter"
+              ctaHref="/contact?subject=Enterprise"
+            />
           </div>
         </div>
-        
+
         <div className="w-full bg-stone-950 text-stone-100 mt-auto">
           <div className="mx-auto max-w-4xl px-6 py-12 text-center">
-            <h2 className="font-display text-3xl md:text-4xl text-white">Your voice. Every language.</h2>
+            <h2 className="font-display text-3xl md:text-4xl text-white">Votre voix. Toutes les langues.</h2>
             <div className="mt-6">
               <Link to="/auth" className="inline-flex rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-transform hover:scale-105">
-                Get started — it's free
+                Commencer gratuitement
               </Link>
             </div>
           </div>
@@ -268,14 +289,17 @@ function UseCase({ icon, title }: { icon: React.ReactNode; title: string }) {
   );
 }
 
-function Plan({ name, price, desc, features, featured = false }: { name: string; price: string; desc: string; features: string[]; featured?: boolean }) {
+function Plan({ name, price, desc, features, featured = false, ctaLabel, ctaHref }: {
+  name: string; price?: string; desc: string; features: string[]; featured?: boolean; ctaLabel: string; ctaHref: string
+}) {
+  const displayPrice = price ?? "Gratuit";
   return (
     <div className={`relative rounded-2xl border p-8 ${featured ? "border-primary bg-primary/[0.04] shadow-lg shadow-emerald-900/10" : "border-border bg-card"}`}>
-      {featured && <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-primary-foreground">Most popular</div>}
+      {featured && <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-primary-foreground">Le plus populaire</div>}
       <div className="font-display text-2xl">{name}</div>
       <div className="mt-4 flex items-baseline gap-1">
-        <span className="font-display text-4xl">{price}</span>
-        {price.startsWith("$") && price !== "$0" && <span className="text-sm text-muted-foreground">/ month</span>}
+        <span className="font-display text-4xl">{displayPrice}</span>
+        {price?.endsWith("€") && <span className="text-sm text-muted-foreground">/ mois</span>}
       </div>
       <p className="mt-2 text-sm text-muted-foreground">{desc}</p>
       <ul className="mt-6 space-y-2 text-sm">
@@ -283,9 +307,9 @@ function Plan({ name, price, desc, features, featured = false }: { name: string;
           <li key={f} className="flex items-start gap-2"><Check className="mt-0.5 h-4 w-4 flex-none text-primary" />{f}</li>
         ))}
       </ul>
-      <Link to="/auth" className={`mt-8 block rounded-md px-4 py-2.5 text-center text-sm font-medium ${featured ? "bg-primary text-primary-foreground hover:bg-primary/90" : "border border-border hover:bg-accent"}`}>
-        Get started
-      </Link>
+      <a href={ctaHref} className={`mt-8 block rounded-md px-4 py-2.5 text-center text-sm font-medium transition-colors ${featured ? "bg-primary text-primary-foreground hover:bg-primary/90" : "border border-border hover:bg-accent"}`}>
+        {ctaLabel}
+      </a>
     </div>
   );
 }
