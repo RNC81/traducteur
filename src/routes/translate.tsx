@@ -11,6 +11,7 @@ function TranslatePage() {
   const navigate = useNavigate();
   const [isLive, setIsLive] = useState(false);
   const [shareCode, setShareCode] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [interimText, setInterimText] = useState("");
   const [finalTexts, setFinalTexts] = useState<{ id: number; text: string }[]>([]);
   const recognitionRef = useRef<any>(null);
@@ -41,6 +42,9 @@ function TranslatePage() {
       if ((window as any).interimInterval) clearInterval((window as any).interimInterval);
       isLiveRef.current = false;
       setIsLive(false);
+      if (sessionId) {
+        fetch(`/api/sessions/${sessionId}`, { method: "PATCH" }).catch(() => {});
+      }
       toast.success("Session terminée.");
       navigate({ to: "/dashboard" });
       return;
@@ -62,6 +66,7 @@ function TranslatePage() {
       const data = await res.json();
       newCode = data.share_code;
       setShareCode(newCode);
+      setSessionId(data.id);
       setIsLive(true);
       isLiveRef.current = true;
     } catch (e: any) {

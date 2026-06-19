@@ -446,6 +446,23 @@ async function handleGetSessionTranscripts(req, res, share_code) {
   return json(res, 200, formatted);
 }
 
+/** PATCH /api/sessions/:id — close session (set is_live=false, ended_at) */
+async function handleCloseSession(req, res, id) {
+  const payload = getUserFromCookie(req);
+  if (!payload) return json(res, 401, { error: "Non authentifié." });
+
+  await connectDB();
+  const session = await Session.findById(id);
+  if (!session) return json(res, 404, { error: "Session non trouvée." });
+  if (session.owner.toString() !== payload.userId) return json(res, 403, { error: "Non autorisé." });
+
+  session.is_live = false;
+  session.ended_at = new Date();
+  await session.save();
+
+  return json(res, 200, { success: true });
+}
+
 /** DELETE /api/sessions/:id — delete session and its transcripts */
 async function handleDeleteSession(req, res, id) {
   const payload = getUserFromCookie(req);
@@ -649,6 +666,9 @@ const httpServer = createServer(async (req, res) => {
     }
     if (req.method === "GET" && pathname.match(/^\/api\/sessions\/([^/]+)$/)) {
       return handleGetSessionInfo(req, res, pathname.split("/")[3]);
+    }
+    if (req.method === "PATCH" && pathname.match(/^\/api\/sessions\/([^/]+)$/)) {
+      return handleCloseSession(req, res, pathname.split("/")[3]);
     }
     if (req.method === "DELETE" && pathname.match(/^\/api\/sessions\/([^/]+)$/)) {
       return handleDeleteSession(req, res, pathname.split("/")[3]);
