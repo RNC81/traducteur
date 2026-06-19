@@ -48,7 +48,8 @@ function OverlayPage() {
       })
       .catch(() => {});
 
-    const eventSource = new EventSource(`/api/stream?share_code=${shareCode}`);
+    const lang = urlParams.get("lang")?.toUpperCase() || "FR";
+    const eventSource = new EventSource(`/api/stream?share_code=${shareCode}&lang=${lang}`);
 
     eventSource.onmessage = (event) => {
       try {
