@@ -26,15 +26,24 @@ const PORT = parseInt(process.env.PORT || "10000", 10);
 
 // ─── ENV ─────────────────────────────────────────────────────────────────────
 const MONGO_URI = process.env.MONGO_URI;
-const JWT_SECRET = process.env.JWT_SECRET || "dev_fallback_only_not_for_prod";
+const JWT_SECRET = process.env.JWT_SECRET;
 
 if (!MONGO_URI) {
-  console.error("❌ MONGO_URI environment variable is not set.");
+  console.error("❌ MONGO_URI manquante — démarrage annulé.");
   process.exit(1);
 }
-if (!process.env.JWT_SECRET) {
-  console.warn("⚠️  JWT_SECRET is not set — using insecure fallback (dev only).");
+if (!JWT_SECRET) {
+  console.error("❌ JWT_SECRET manquante — démarrage annulé.");
+  process.exit(1);
 }
+
+console.log("─────────────────────────────────────────────");
+console.log(`✅ MONGO_URI         présente`);
+console.log(`✅ JWT_SECRET        présente`);
+console.log(`${process.env.GEMINI_API_KEY  ? "✅" : "⚠️ "} GEMINI_API_KEY  ${process.env.GEMINI_API_KEY  ? "présente" : "absente (traduction dégradée)"}`);
+console.log(`${process.env.OPENAI_API_KEY  ? "✅" : "⚠️ "} OPENAI_API_KEY  ${process.env.OPENAI_API_KEY  ? "présente" : "absente (fallback Mistral actif)"}`);
+console.log(`${process.env.MISTRAL_API_KEY ? "✅" : "⚠️ "} MISTRAL_API_KEY ${process.env.MISTRAL_API_KEY ? "présente" : "absente"}`);
+console.log("─────────────────────────────────────────────");
 
 // ─── DATABASE ────────────────────────────────────────────────────────────────
 let dbConn = null;
