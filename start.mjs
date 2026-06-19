@@ -573,7 +573,7 @@ const MIME = {
 console.log("⏳ Loading SSR handler...");
 let ssrHandler;
 try {
-  const mod = await import("./dist/server/index.js");
+  const mod = await import("./dist/server/server.js");
   ssrHandler = mod.default;
   console.log("✅ SSR handler loaded.");
 } catch (err) {
