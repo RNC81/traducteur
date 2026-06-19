@@ -21,7 +21,7 @@ function LegalPage() {
               Le site internet <strong>Verba Live</strong> est édité par l'entité <strong>secrgnp</strong>.
             </p>
             <p className="mt-2">
-              Email de contact : <a href="mailto:contact@verba-live.com" className="text-primary hover:underline">contact@verba-live.com</a>
+              Email de contact : <a href="mailto:contact@secrgnp.cloud" className="text-primary hover:underline">contact@secrgnp.cloud</a>
             </p>
           </section>
 

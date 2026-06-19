@@ -77,7 +77,7 @@ function ContactPage() {
 
       setSuccess(true);
     } catch {
-      toast.error("Une erreur est survenue. Veuillez réessayer ou nous écrire directement à contact@verba-live.com");
+      toast.error("Une erreur est survenue. Veuillez réessayer ou nous écrire directement à contact@secrgnp.cloud");
     } finally {
       setLoading(false);
     }
@@ -110,10 +110,10 @@ function ContactPage() {
                     <h3 className="font-medium text-lg">Email</h3>
                     <p className="text-muted-foreground text-sm mt-1">Notre équipe vous répondra sous 24h.</p>
                     <a
-                      href="mailto:contact@verba-live.com"
+                      href="mailto:contact@secrgnp.cloud"
                       className="text-primary hover:underline text-sm font-medium mt-2 inline-block"
                     >
-                      contact@verba-live.com
+                      contact@secrgnp.cloud
                     </a>
                   </div>
                 </div>
