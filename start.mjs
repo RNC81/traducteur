@@ -51,6 +51,7 @@ const UserSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String },
     name: { type: String },
+    isAdmin: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
@@ -406,7 +407,7 @@ async function handleMe(req, res) {
   await connectDB();
   const user = await User.findById(payload.userId).select("-password").lean();
   if (!user) return json(res, 200, { user: null });
-  return json(res, 200, { user: { id: user._id.toString(), email: user.email, name: user.name } });
+  return json(res, 200, { user: { id: user._id.toString(), email: user.email, name: user.name, isAdmin: user.isAdmin === true } });
 }
 
 /** POST /api/auth/signout */
