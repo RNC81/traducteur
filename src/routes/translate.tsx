@@ -24,6 +24,8 @@ function TranslatePage() {
   const lastSentInterimRef = useRef("");
   const [context, setContext] = useState("");
   const [sourceLang, setSourceLang] = useState("fr");
+  const [obsLang, setObsLang] = useState("fr");
+  const [displayLang, setDisplayLang] = useState("fr");
 
   useEffect(() => {
     fetch("/api/auth/me")
@@ -43,14 +45,14 @@ function TranslatePage() {
 
   const copyOBSLink = () => {
     if (!shareCode) return;
-    const url = `${window.location.origin}/overlay/${shareCode}?lang=FR`;
+    const url = `${window.location.origin}/overlay/${shareCode}?lang=${obsLang.toUpperCase()}`;
     navigator.clipboard.writeText(url);
     toast.success("Lien Régie (OBS) copié !");
   };
 
   const copyDisplayLink = () => {
     if (!shareCode) return;
-    const url = `${window.location.origin}/display/${shareCode}?lang=FR`;
+    const url = `${window.location.origin}/display/${shareCode}?lang=${displayLang.toUpperCase()}`;
     navigator.clipboard.writeText(url);
     toast.success("Lien Écran copié !");
   };
@@ -188,9 +190,19 @@ function TranslatePage() {
               >
                 /live/{shareCode}
               </a>
+              <select
+                value={obsLang}
+                onChange={(e) => setObsLang(e.target.value)}
+                className="rounded-md border border-border bg-background px-2 py-1 text-xs focus:outline-none"
+                title="Langue Régie (OBS)"
+              >
+                {SUPPORTED_LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>{l.label}</option>
+                ))}
+              </select>
               <button
                 onClick={copyOBSLink}
-                className="ml-2 rounded-md bg-emerald-500/10 p-1.5 text-emerald-500 hover:bg-emerald-500/20 transition-colors"
+                className="rounded-md bg-emerald-500/10 p-1.5 text-emerald-500 hover:bg-emerald-500/20 transition-colors"
                 title="Copier le lien Régie (OBS)"
               >
                 <MonitorPlay className="h-4 w-4" />
@@ -202,6 +214,16 @@ function TranslatePage() {
               >
                 <QrCode className="h-4 w-4" />
               </button>
+              <select
+                value={displayLang}
+                onChange={(e) => setDisplayLang(e.target.value)}
+                className="rounded-md border border-border bg-background px-2 py-1 text-xs focus:outline-none"
+                title="Langue Écran"
+              >
+                {SUPPORTED_LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>{l.label}</option>
+                ))}
+              </select>
               <button
                 onClick={copyDisplayLink}
                 className="rounded-md bg-violet-500/10 p-1.5 text-violet-500 hover:bg-violet-500/20 transition-colors"
