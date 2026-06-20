@@ -11,39 +11,18 @@ type TranscriptLine = {
   timestamp: string;
 };
 
-const LANGS = [
-  { code: "FR", label: "Français" },
-  { code: "EN", label: "English" },
-  { code: "AR", label: "العربية" },
-  { code: "FA", label: "فارسی" },
-  { code: "UR", label: "اردو" },
-  { code: "HI", label: "हिन्दी" },
-  { code: "TR", label: "Türkçe" },
-  { code: "DE", label: "Deutsch" },
-  { code: "ES", label: "Español" },
-  { code: "PT", label: "Português" },
-];
-
 function DisplayPage() {
   const { shareCode } = Route.useParams();
   const [transcripts, setTranscripts] = useState<TranscriptLine[]>([]);
   const [interimTranscript, setInterimTranscript] = useState<{ original_text: string; translations: Record<string, string> } | null>(null);
   const [selectedLang, setSelectedLang] = useState("FR");
   const [visible, setVisible] = useState(true);
-  const [showSelector, setShowSelector] = useState(true);
   const hideTimeoutRef = useRef<any>(null);
-  const selectorTimeoutRef = useRef<any>(null);
 
   const resetHideTimeout = () => {
     setVisible(true);
     if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
     hideTimeoutRef.current = setTimeout(() => setVisible(false), 10000);
-  };
-
-  const resetSelectorTimeout = () => {
-    setShowSelector(true);
-    if (selectorTimeoutRef.current) clearTimeout(selectorTimeoutRef.current);
-    selectorTimeoutRef.current = setTimeout(() => setShowSelector(false), 3000);
   };
 
   useEffect(() => {
@@ -82,12 +61,9 @@ function DisplayPage() {
       } catch { /* keep-alive */ }
     };
 
-    resetSelectorTimeout();
-
     return () => {
       eventSource.close();
       if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
-      if (selectorTimeoutRef.current) clearTimeout(selectorTimeoutRef.current);
     };
   }, [shareCode]);
 
@@ -97,28 +73,12 @@ function DisplayPage() {
     : displayItem?.translations?.[selectedLang] || displayItem?.original_text;
 
   return (
-    <div
-      className="fixed inset-0 bg-black flex flex-col items-center justify-center overflow-hidden"
-      onMouseMove={resetSelectorTimeout}
-      onTouchStart={resetSelectorTimeout}
-    >
+    <div className="fixed inset-0 bg-black flex items-center justify-center overflow-hidden">
       <div className={`transition-opacity duration-1000 px-12 w-full flex items-center justify-center ${visible && textToShow ? "opacity-100" : "opacity-0"}`}>
         <p className="text-white text-6xl font-bold text-center leading-tight tracking-wide max-w-5xl"
           style={{ textShadow: "0 2px 30px rgba(0,0,0,0.8)" }}>
           {textToShow}
         </p>
-      </div>
-
-      <div className={`absolute bottom-8 flex justify-center transition-opacity duration-500 ${showSelector ? "opacity-100" : "opacity-0"}`}>
-        <select
-          value={selectedLang}
-          onChange={(e) => setSelectedLang(e.target.value)}
-          className="bg-white/10 text-white/70 text-sm rounded-md px-3 py-1.5 border border-white/20 focus:outline-none backdrop-blur-sm cursor-pointer"
-        >
-          {LANGS.map(l => (
-            <option key={l.code} value={l.code} className="bg-black text-white">{l.label}</option>
-          ))}
-        </select>
       </div>
     </div>
   );
