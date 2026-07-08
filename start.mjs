@@ -176,21 +176,30 @@ async function translateFast(text, targetLangs, contextStr) {
   const contextPrompt = contextStr ? ` Contexte de ce discours : "${contextStr}".` : "";
   const prompt = `Traduisez rapidement le texte suivant dans les langues demandées: [${targetLangs.join(", ")}].${contextPrompt} Renvoyez UNIQUEMENT un objet JSON valide avec les codes de langue comme clés et les traductions comme valeurs.`;
   const userMessage = `Texte à traduire : "${text}"`;
+  const fullPrompt = prompt + "\n\n" + userMessage;
+
+  // TODO(debug): remove — temporary diagnostic logging
+  console.log(`[DEBUG] translateFast prompt=${JSON.stringify(fullPrompt)}`);
 
   try {
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt + "\n\n" + userMessage }] }],
+        contents: [{ parts: [{ text: fullPrompt }] }],
       })
     });
     const data = await res.json();
+
+    // TODO(debug): remove — temporary diagnostic logging
+    console.log(`[DEBUG] translateFast raw Gemini response=${JSON.stringify(data)}`);
+
     let jsonResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
     jsonResponse = jsonResponse.replace(/```json/g, "").replace(/```/g, "").trim();
     return JSON.parse(jsonResponse);
   } catch (err) {
-    console.error(`AI Fast Translation error:`, err);
+    // TODO(debug): remove — temporary diagnostic logging
+    console.error(`[DEBUG] translateFast error (was silently swallowed before): ${err?.message || err}`, { text, targetLangs, contextStr });
     return targetLangs.reduce((acc, lang) => ({ ...acc, [lang]: "[Error] " + text }), {});
   }
 }
