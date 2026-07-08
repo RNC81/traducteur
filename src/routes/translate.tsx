@@ -422,7 +422,7 @@ function TranslatePage() {
                         : "border-border bg-background text-muted-foreground hover:bg-accent"
                     }`}
                   >
-                    Soniox (recommandé)
+                    Haute précision (recommandé)
                   </button>
                   <button
                     type="button"
@@ -433,7 +433,7 @@ function TranslatePage() {
                         : "border-border bg-background text-muted-foreground hover:bg-accent"
                     }`}
                   >
-                    Web Speech API (fallback)
+                    Standard (fallback)
                   </button>
                 </div>
               </div>
