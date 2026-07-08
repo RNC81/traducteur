@@ -12,6 +12,8 @@ import { createServer } from "node:http";
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { join, extname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { WebSocketServer } from "ws";
+import { SonioxNodeClient, RealtimeUtteranceBuffer } from "@soniox/node";
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
@@ -27,6 +29,12 @@ const PORT = parseInt(process.env.PORT || "10000", 10);
 // ─── ENV ─────────────────────────────────────────────────────────────────────
 const MONGO_URI = process.env.MONGO_URI;
 const JWT_SECRET = process.env.JWT_SECRET;
+const SONIOX_API_KEY = process.env.SONIOX_API_KEY;
+
+// Public origin of this app (e.g. https://verba-app.onrender.com on Render).
+// Falls back to localhost in dev — never process.exit, Soniox is optional.
+const PUBLIC_APP_URL = process.env.PUBLIC_APP_URL || `http://localhost:${PORT}`;
+const ALLOWED_WS_ORIGINS = new Set([PUBLIC_APP_URL]);
 
 if (!MONGO_URI) {
   console.error("❌ MONGO_URI manquante — démarrage annulé.");
@@ -43,6 +51,8 @@ console.log(`✅ JWT_SECRET        présente`);
 console.log(`${process.env.GEMINI_API_KEY  ? "✅" : "⚠️ "} GEMINI_API_KEY  ${process.env.GEMINI_API_KEY  ? "présente" : "absente (traduction dégradée)"}`);
 console.log(`${process.env.OPENAI_API_KEY  ? "✅" : "⚠️ "} OPENAI_API_KEY  ${process.env.OPENAI_API_KEY  ? "présente" : "absente (fallback Mistral actif)"}`);
 console.log(`${process.env.MISTRAL_API_KEY ? "✅" : "⚠️ "} MISTRAL_API_KEY ${process.env.MISTRAL_API_KEY ? "présente" : "absente"}`);
+console.log(`${SONIOX_API_KEY ? "✅" : "⚠️ "} SONIOX_API_KEY  ${SONIOX_API_KEY ? "présente" : "absente (mode Soniox indisponible, fallback Web Speech API uniquement)"}`);
+console.log(`   PUBLIC_APP_URL    ${PUBLIC_APP_URL}${process.env.PUBLIC_APP_URL ? "" : " (défaut dev — définir PUBLIC_APP_URL en prod)"}`);
 console.log("─────────────────────────────────────────────");
 
 // ─── DATABASE ────────────────────────────────────────────────────────────────
@@ -243,88 +253,37 @@ Votre mission :
   }
 }
 
-// ─── API HANDLERS ────────────────────────────────────────────────────────────
+// ─── SHARED TRANSCRIPT PIPELINE ──────────────────────────────────────────────
+// Extracted so both the HTTP handler (Web Speech API fallback) and the Soniox
+// WebSocket handler can push a finalized segment through the same
+// persist -> broadcast draft -> background verify -> broadcast verified flow.
 
-/** POST /api/transcripts/interim — ultra-fast word-by-word translation */
-async function handleAddInterimTranscript(req, res) {
-  const payload = getUserFromCookie(req);
-  if (!payload) return json(res, 401, { error: "Non authentifié." });
-
-  const { share_code, original_text } = await readBody(req);
-  if (!share_code || !original_text) return json(res, 400, { error: "share_code et original_text requis." });
-
-  await connectDB();
-  const session = await Session.findOne({ share_code });
-  if (!session) return json(res, 404, { error: "Session introuvable." });
-  
-  // LAZY TRANSLATION: Only translate to languages actively requested by connected clients
-  const clientsMap = sseClients.get(share_code);
-  const activeLangs = clientsMap ? Array.from(new Set(clientsMap.values())) : [];
-  
-  if (activeLangs.length === 0) {
-    return json(res, 200, { success: true, skipped_translation: true });
-  }
-
-  const targetLangs = activeLangs;
-  
-  // Use google-translate-api-x for fast free unlimited word-by-word
-  let translations = {};
+/** Draft translation via google-translate-api-x. contextStr is accepted but
+ * unused, to keep the same call signature as translateFast (Gemini). */
+async function draftTranslateGoogle(text, targetLangs, _contextStr) {
+  const translations = {};
   try {
     const promises = targetLangs.map(async (lang) => {
       const gLang = lang.toLowerCase();
-      const result = await translateGoogle(original_text, { to: gLang });
+      const result = await translateGoogle(text, { to: gLang });
       return { lang: lang.toUpperCase(), text: result.text };
     });
     const results = await Promise.all(promises);
     results.forEach(r => { translations[r.lang] = r.text; });
   } catch (err) {
-    console.error("Interim translation error:", err);
+    console.error("Draft translation error (Google):", err);
   }
-
-  const sessionClients = sseClients.get(share_code);
-  if (sessionClients) {
-    const msg = JSON.stringify({
-      type: "interim",
-      original_text,
-      translations
-    });
-    sessionClients.forEach((_, send) => send(`data: ${msg}\n\n`));
-  }
-
-  return json(res, 200, { success: true });
+  return translations;
 }
 
-/** POST /api/transcripts — add transcript and broadcast via SSE */
-async function handleAddTranscript(req, res) {
-  const payload = getUserFromCookie(req);
-  if (!payload) return json(res, 401, { error: "Non authentifié." });
-
-  const { share_code, original_text } = await readBody(req);
-  if (!share_code || !original_text) return json(res, 400, { error: "share_code et original_text requis." });
-
-  await connectDB();
-  const session = await Session.findOne({ share_code });
-  if (!session) return json(res, 404, { error: "Session introuvable. Créez d'abord une session." });
-  if (session.owner.toString() !== payload.userId) return json(res, 403, { error: "Non autorisé." });
-
+/** Persist + broadcast a finalized transcript segment, then verify it in the
+ * background. draftTranslate: (text, targetLangs, contextStr) => Promise<Record<string,string>> */
+async function processFinalTranscript(session, share_code, original_text, { draftTranslate }) {
   // LAZY TRANSLATION: Only translate to languages actively requested by connected clients
   const clientsMap = sseClients.get(share_code);
   const activeLangs = clientsMap ? Array.from(new Set(clientsMap.values())) : (session.target_langs || []);
 
-  // 1. FAST DRAFT (using Google Translate)
-  const draftTranslations = {};
-  
-  try {
-    const promises = activeLangs.map(async (lang) => {
-      const gLang = lang.toLowerCase();
-      const result = await translateGoogle(original_text, { to: gLang });
-      return { lang: lang.toUpperCase(), text: result.text };
-    });
-    const results = await Promise.all(promises);
-    results.forEach(r => { draftTranslations[r.lang] = r.text; });
-  } catch (err) {
-    console.error("Fast draft translation error:", err);
-  }
+  const draftTranslations = await draftTranslate(original_text, activeLangs, session.context);
 
   let transcript = await Transcript.create({
     session_id: session._id,
@@ -351,7 +310,7 @@ async function handleAddTranscript(req, res) {
     sessionClients.forEach((_, send) => send(`data: ${msg}\n\n`));
   }
 
-  // 2. BACKGROUND VERIFICATION
+  // BACKGROUND VERIFICATION
   if (activeLangs.length > 0) {
     verifyTranslation(original_text, safeTranslations, session.context, activeLangs).then(async (rawFinal) => {
       const finalTranslations = { ...safeTranslations };
@@ -379,6 +338,311 @@ async function handleAddTranscript(req, res) {
       }
     });
   }
+
+  return transcript;
+}
+
+// ─── SONIOX REALTIME STT ─────────────────────────────────────────────────────
+const sonioxClient = SONIOX_API_KEY ? new SonioxNodeClient({ api_key: SONIOX_API_KEY }) : null;
+
+// One active Soniox producer per share_code (security #5) — value is either
+// { pending: true, ownerId } (reserved during handshake) or the live
+// { ws, sttSession } pair once attachSonioxWsHandlers takes over.
+const sonioxSessions = new Map();
+
+// Upgrade attempt rate limiting per user (security #10) — in-memory is
+// consistent with sseClients: single Render instance, no Redis in this stack.
+const sonioxUpgradeAttempts = new Map();
+const SONIOX_UPGRADE_RATE_LIMIT = 5;          // max upgrade attempts...
+const SONIOX_UPGRADE_RATE_WINDOW_MS = 60_000; // ...per rolling window (ms)
+const SONIOX_MAX_SESSION_MS = 10_800_000;     // hard cap: 3h (10800s) per stream
+
+function isSonioxUpgradeRateLimited(userId) {
+  const now = Date.now();
+  const entry = sonioxUpgradeAttempts.get(userId);
+  if (!entry || now - entry.windowStart > SONIOX_UPGRADE_RATE_WINDOW_MS) {
+    sonioxUpgradeAttempts.set(userId, { count: 1, windowStart: now });
+    return false;
+  }
+  entry.count += 1;
+  return entry.count > SONIOX_UPGRADE_RATE_LIMIT;
+}
+
+/** Write a raw HTTP response on the not-yet-upgraded socket and close it.
+ * Used for every rejection path in handleSonioxUpgrade — the connection is
+ * still plain HTTP at this point, res.writeHead() is not available. */
+function rejectUpgrade(socket, status, message) {
+  socket.write(`HTTP/1.1 ${status} ${message}\r\n\r\n`);
+  socket.destroy();
+}
+
+/**
+ * Validate a GET /api/soniox-stream?share_code=X upgrade request before
+ * accepting the WebSocket. Security checks, in order:
+ *   #1  CSWSH        — Origin must be in ALLOWED_WS_ORIGINS
+ *   #2  Auth          — valid auth_token JWT cookie required
+ *   #10 Rate limiting — max upgrade attempts per user per window
+ *   #3  IDOR          — share_code is public (audience-facing); only the
+ *                       session owner may push audio into it
+ *   #4  Zombie session — reject if session.is_live is false
+ *   #5  Single producer — reject a second concurrent stream for the same
+ *                       share_code; reservation is synchronous (no await
+ *                       between the check and the Map.set) to avoid a
+ *                       check-then-act race between concurrent upgrades
+ */
+async function handleSonioxUpgrade(req, socket, head) {
+  // #1 — CSWSH: WebSocket upgrades ignore the Same-Origin Policy, so the
+  // browser attaches auth_token regardless of which site initiated the
+  // connection. Reject anything not explicitly allowed before doing any work.
+  const origin = req.headers.origin;
+  if (!origin || !ALLOWED_WS_ORIGINS.has(origin)) {
+    return rejectUpgrade(socket, 403, "Forbidden");
+  }
+
+  const { searchParams } = new URL(req.url, "http://x");
+  const share_code = searchParams.get("share_code");
+  if (!share_code) {
+    return rejectUpgrade(socket, 400, "Bad Request");
+  }
+
+  if (!sonioxClient) {
+    return rejectUpgrade(socket, 503, "Service Unavailable");
+  }
+
+  // #2 — Auth: same JWT cookie check as every other authenticated route.
+  const payload = getUserFromCookie(req);
+  if (!payload) {
+    return rejectUpgrade(socket, 401, "Unauthorized");
+  }
+
+  // #10 — Rate limit upgrade attempts per user before touching the DB.
+  if (isSonioxUpgradeRateLimited(payload.userId)) {
+    return rejectUpgrade(socket, 429, "Too Many Requests");
+  }
+
+  await connectDB();
+  const session = await Session.findOne({ share_code });
+  if (!session) {
+    return rejectUpgrade(socket, 404, "Not Found");
+  }
+
+  // #3 — IDOR: share_code alone is not a valid credential for audio
+  // ingestion (it's the same code the audience uses on /api/stream).
+  if (session.owner.toString() !== payload.userId) {
+    return rejectUpgrade(socket, 403, "Forbidden");
+  }
+
+  // #4 — Reject zombie sessions (already closed via handleCloseSession).
+  if (!session.is_live) {
+    return rejectUpgrade(socket, 409, "Conflict");
+  }
+
+  // #5 — Single producer per session. Check-and-reserve with no `await` in
+  // between: JS is single-threaded and nothing yields the event loop here,
+  // so this closes the race between two concurrent upgrade attempts for the
+  // same share_code (e.g. duplicate tab).
+  if (sonioxSessions.has(share_code)) {
+    return rejectUpgrade(socket, 409, "Conflict");
+  }
+  sonioxSessions.set(share_code, { pending: true, ownerId: payload.userId });
+
+  wss.handleUpgrade(req, socket, head, (ws) => {
+    attachSonioxWsHandlers(ws, session, share_code, payload.userId);
+  });
+}
+
+/**
+ * Wire a freshly-upgraded WebSocket to a Soniox realtime STT session for the
+ * given (already validated) live session. Owns the full lifecycle: connect,
+ * audio relay, result routing, cleanup.
+ *
+ *   - Client -> server: binary frames only (raw PCM audio). Any text frame
+ *     is rejected with ws.close(1003) (security #6).
+ *   - is_final:false tokens -> {type:"interim"} sent back over this same ws,
+ *     speaker-local display only — never broadcast to the audience over SSE.
+ *   - is_final:true tokens -> processFinalTranscript(..., { draftTranslate:
+ *     translateFast }), which persists + broadcasts to the audience exactly
+ *     like the Web Speech API path, but drafts with Gemini instead of
+ *     Google Translate.
+ *   - Errors sent to the client are always generic (security #7) — the raw
+ *     Soniox error is only logged server-side.
+ *   - cleanup() is idempotent and runs on ws close/error, sttSession error,
+ *     or the SONIOX_MAX_SESSION_MS hard cap: sttSession.close(),
+ *     sonioxSessions.delete(share_code), clearTimeout(hardCapTimer).
+ */
+async function attachSonioxWsHandlers(ws, session, share_code, _userId) {
+  let cleanedUp = false;
+  let hardCapTimer = null;
+
+  const sttSession = sonioxClient.realtime.stt({
+    model: "stt-rt-v5",
+    audio_format: "pcm_s16le",
+    sample_rate: 16000,
+    num_channels: 1,
+    language_hints: session.source_lang ? [session.source_lang] : undefined,
+    enable_endpoint_detection: true,
+  });
+
+  // Collects is_final tokens across "result" events and flushes one full
+  // utterance on "endpoint" — avoids calling processFinalTranscript (Gemini
+  // draft + GPT/Mistral verify) once per incrementally-finalized token.
+  const utteranceBuffer = new RealtimeUtteranceBuffer();
+
+  function cleanup() {
+    if (cleanedUp) return;
+    cleanedUp = true;
+    if (hardCapTimer) clearTimeout(hardCapTimer);
+    sonioxSessions.delete(share_code);
+
+    // Flush any buffered final tokens that never got an "endpoint" — same
+    // logic as the "endpoint" handler, so a stream that ends mid-utterance
+    // doesn't silently lose the trailing segment.
+    const utterance = utteranceBuffer.markEndpoint();
+    if (utterance && utterance.text) {
+      try {
+        ws.send(JSON.stringify({ type: "final", text: utterance.text }));
+      } catch (err) {
+        console.error("[soniox] failed to send final to speaker (cleanup flush):", err);
+      }
+      processFinalTranscript(session, share_code, utterance.text, { draftTranslate: translateFast }).catch((err) => {
+        console.error("[soniox] processFinalTranscript error (cleanup flush):", err);
+      });
+    }
+
+    try { sttSession.close(); } catch { /* already closed */ }
+    try { ws.close(); } catch { /* already closed */ }
+  }
+
+  sttSession.on("result", (result) => {
+    const interimText = result.tokens.filter((t) => !t.is_final).map((t) => t.text).join("");
+    if (interimText) {
+      try {
+        ws.send(JSON.stringify({ type: "interim", text: interimText }));
+      } catch (err) {
+        console.error("[soniox] failed to send interim to speaker:", err);
+      }
+    }
+
+    // Buffer is_final tokens; they are only turned into a transcript segment
+    // when an endpoint (utterance boundary) is detected, see below.
+    utteranceBuffer.addResult(result);
+  });
+
+  sttSession.on("endpoint", () => {
+    const utterance = utteranceBuffer.markEndpoint();
+    if (utterance && utterance.text) {
+      try {
+        ws.send(JSON.stringify({ type: "final", text: utterance.text }));
+      } catch (err) {
+        console.error("[soniox] failed to send final to speaker:", err);
+      }
+      processFinalTranscript(session, share_code, utterance.text, { draftTranslate: translateFast }).catch((err) => {
+        console.error("[soniox] processFinalTranscript error:", err);
+      });
+    }
+  });
+
+  sttSession.on("error", (err) => {
+    console.error("[soniox] STT session error:", err);
+    try { ws.send(JSON.stringify({ type: "error", message: "stt_error" })); } catch { /* socket already gone */ }
+    cleanup();
+  });
+
+  ws.on("message", (data, isBinary) => {
+    if (!isBinary) {
+      ws.close(1003, "binary only");
+      return;
+    }
+    try {
+      sttSession.sendAudio(data);
+    } catch (err) {
+      console.error("[soniox] sendAudio error:", err);
+    }
+  });
+
+  ws.on("close", cleanup);
+  ws.on("error", (err) => {
+    console.error("[soniox] WebSocket error:", err);
+    cleanup();
+  });
+
+  try {
+    await sttSession.connect();
+  } catch (err) {
+    console.error("[soniox] connect() failed:", err);
+    try { ws.send(JSON.stringify({ type: "error", message: "stt_connect_failed" })); } catch { /* noop */ }
+    cleanup();
+    return;
+  }
+
+  sonioxSessions.set(share_code, { ws, sttSession });
+
+  // Hard cap: force-close long-running streams (cost guard on a paid API).
+  hardCapTimer = setTimeout(() => {
+    console.log(`[soniox] hard cap reached (${SONIOX_MAX_SESSION_MS}ms) for share_code=${share_code}`);
+    cleanup();
+  }, SONIOX_MAX_SESSION_MS);
+
+  try {
+    ws.send(JSON.stringify({ type: "ready" }));
+  } catch (err) {
+    console.error("[soniox] failed to send ready ack:", err);
+  }
+}
+
+// ─── API HANDLERS ────────────────────────────────────────────────────────────
+
+/** POST /api/transcripts/interim — ultra-fast word-by-word translation */
+async function handleAddInterimTranscript(req, res) {
+  const payload = getUserFromCookie(req);
+  if (!payload) return json(res, 401, { error: "Non authentifié." });
+
+  const { share_code, original_text } = await readBody(req);
+  if (!share_code || !original_text) return json(res, 400, { error: "share_code et original_text requis." });
+
+  await connectDB();
+  const session = await Session.findOne({ share_code });
+  if (!session) return json(res, 404, { error: "Session introuvable." });
+
+  // LAZY TRANSLATION: Only translate to languages actively requested by connected clients
+  const clientsMap = sseClients.get(share_code);
+  const activeLangs = clientsMap ? Array.from(new Set(clientsMap.values())) : [];
+
+  if (activeLangs.length === 0) {
+    return json(res, 200, { success: true, skipped_translation: true });
+  }
+
+  const targetLangs = activeLangs;
+
+  const translations = await draftTranslateGoogle(original_text, targetLangs);
+
+  const sessionClients = sseClients.get(share_code);
+  if (sessionClients) {
+    const msg = JSON.stringify({
+      type: "interim",
+      original_text,
+      translations
+    });
+    sessionClients.forEach((_, send) => send(`data: ${msg}\n\n`));
+  }
+
+  return json(res, 200, { success: true });
+}
+
+/** POST /api/transcripts — add transcript and broadcast via SSE */
+async function handleAddTranscript(req, res) {
+  const payload = getUserFromCookie(req);
+  if (!payload) return json(res, 401, { error: "Non authentifié." });
+
+  const { share_code, original_text } = await readBody(req);
+  if (!share_code || !original_text) return json(res, 400, { error: "share_code et original_text requis." });
+
+  await connectDB();
+  const session = await Session.findOne({ share_code });
+  if (!session) return json(res, 404, { error: "Session introuvable. Créez d'abord une session." });
+  if (session.owner.toString() !== payload.userId) return json(res, 403, { error: "Non autorisé." });
+
+  await processFinalTranscript(session, share_code, original_text, { draftTranslate: draftTranslateGoogle });
 
   return json(res, 200, { success: true });
 }
@@ -711,6 +975,21 @@ const httpServer = createServer(async (req, res) => {
     if (!res.headersSent) res.writeHead(500, { "Content-Type": "text/plain" });
     res.end("Internal Server Error");
   }
+});
+
+// ─── SONIOX WEBSOCKET UPGRADE ─────────────────────────────────────────────────
+const wss = new WebSocketServer({ noServer: true, maxPayload: 262_144 }); // 256KB/frame cap (security #6)
+
+httpServer.on("upgrade", (req, socket, head) => {
+  const { pathname } = new URL(req.url, "http://x");
+  if (pathname !== "/api/soniox-stream") {
+    socket.destroy();
+    return;
+  }
+  handleSonioxUpgrade(req, socket, head).catch((err) => {
+    console.error("[soniox] handleSonioxUpgrade error:", err);
+    socket.destroy();
+  });
 });
 
 httpServer.listen(PORT, "0.0.0.0", () => {
