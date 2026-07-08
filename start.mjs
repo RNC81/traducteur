@@ -285,6 +285,9 @@ async function processFinalTranscript(session, share_code, original_text, { draf
 
   const draftTranslations = await draftTranslate(original_text, activeLangs, session.context);
 
+  // TODO(debug): remove — temporary diagnostic logging
+  console.log(`[DEBUG] draftTranslations share_code=${share_code} result=${JSON.stringify(draftTranslations)}`);
+
   let transcript = await Transcript.create({
     session_id: session._id,
     original_text,
@@ -307,12 +310,18 @@ async function processFinalTranscript(session, share_code, original_text, { draf
       is_final: transcript.is_final,
       timestamp: transcript.timestamp,
     });
+    // TODO(debug): remove — temporary diagnostic logging
+    console.log(`[DEBUG] SSE broadcast (final_draft) share_code=${share_code} msg=${msg}`);
     sessionClients.forEach((_, send) => send(`data: ${msg}\n\n`));
   }
 
   // BACKGROUND VERIFICATION
   if (activeLangs.length > 0) {
+    // TODO(debug): remove — temporary diagnostic logging
+    console.log(`[DEBUG] calling verifyTranslation share_code=${share_code} original_text=${JSON.stringify(original_text)} draft=${JSON.stringify(safeTranslations)} activeLangs=${JSON.stringify(activeLangs)}`);
     verifyTranslation(original_text, safeTranslations, session.context, activeLangs).then(async (rawFinal) => {
+      // TODO(debug): remove — temporary diagnostic logging
+      console.log(`[DEBUG] verifyTranslation returned share_code=${share_code} rawFinal=${JSON.stringify(rawFinal)}`);
       const finalTranslations = { ...safeTranslations };
       for (const [k, v] of Object.entries(rawFinal || {})) {
         if (v && typeof v === "string" && v.trim() !== "") {
@@ -334,6 +343,8 @@ async function processFinalTranscript(session, share_code, original_text, { draf
           is_final: true,
           timestamp: transcript.timestamp,
         });
+        // TODO(debug): remove — temporary diagnostic logging
+        console.log(`[DEBUG] SSE broadcast (final_verified) share_code=${share_code} msg=${finalMsg}`);
         verifiedSessionClients.forEach((_, send) => send(`data: ${finalMsg}\n\n`));
       }
     });
