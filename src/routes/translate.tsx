@@ -27,6 +27,13 @@ function TranslatePage() {
   const [obsLang, setObsLang] = useState("fr");
   const [displayLang, setDisplayLang] = useState("fr");
 
+  const [sttMode, setSttMode] = useState<"soniox" | "webspeech">("soniox");
+  const wsRef = useRef<WebSocket | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const workletNodeRef = useRef<AudioWorkletNode | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const sonioxReadyRef = useRef(false);
+
   useEffect(() => {
     fetch("/api/auth/me")
       .then((r) => r.json())
@@ -57,44 +64,29 @@ function TranslatePage() {
     toast.success("Lien Écran copié !");
   };
 
-  const toggleLive = async () => {
-    if (isLive) {
-      recognitionRef.current?.stop();
-      if ((window as any).interimInterval) clearInterval((window as any).interimInterval);
-      isLiveRef.current = false;
-      setIsLive(false);
-      if (sessionId) {
-        fetch(`/api/sessions/${sessionId}`, { method: "PATCH" }).catch(() => {});
-      }
-      toast.success("Session terminée.");
-      navigate({ to: "/dashboard" });
-      return;
-    }
+  function stopWebSpeechRecognition() {
+    recognitionRef.current?.stop();
+    if ((window as any).interimInterval) clearInterval((window as any).interimInterval);
+  }
 
-    let newCode = "";
-    try {
-      const res = await fetch("/api/sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          title: "Session Live", 
-          mode: "live",
-          source_lang: sourceLang,
-          context: context
-        }),
-      });
-      if (!res.ok) throw new Error("Erreur de création de session");
-      const data = await res.json();
-      newCode = data.share_code;
-      setShareCode(newCode);
-      setSessionId(data.id);
-      setIsLive(true);
-      isLiveRef.current = true;
-    } catch (e: any) {
-      toast.error(e.message || "Impossible de démarrer la session.");
-      return;
-    }
+  async function stopSonioxStream() {
+    workletNodeRef.current?.port.postMessage({ type: "flush" });
+    // Give the flushed chunk time to cross from the audio thread to this
+    // handler and reach ws.send() before the socket closes underneath it.
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
+    workletNodeRef.current?.disconnect();
+    workletNodeRef.current = null;
+    audioContextRef.current?.close();
+    audioContextRef.current = null;
+    wsRef.current?.close();
+    wsRef.current = null;
+    mediaStreamRef.current?.getTracks().forEach((t) => t.stop());
+    mediaStreamRef.current = null;
+    sonioxReadyRef.current = false;
+  }
+
+  function startWebSpeechRecognition(newCode: string) {
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -131,7 +123,7 @@ function TranslatePage() {
       }
       interimRef.current = interim;
       setInterimText(interim);
-      
+
       if (final) {
         interimRef.current = ""; // Clear interim when final triggers
         setFinalTexts((prev) => [...prev, { id: Date.now(), text: final }]);
@@ -172,6 +164,133 @@ function TranslatePage() {
 
     recognition.start();
     recognitionRef.current = recognition;
+  }
+
+  async function startSonioxStream(newCode: string) {
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      toast.error("Accès au microphone refusé. Vérifiez les paramètres de confidentialité de votre ordinateur/navigateur.");
+      setIsLive(false);
+      isLiveRef.current = false;
+      return;
+    }
+    mediaStreamRef.current = stream;
+
+    const audioContext = new AudioContext();
+    audioContextRef.current = audioContext;
+
+    try {
+      await audioContext.audioWorklet.addModule("/pcm-worklet.js");
+    } catch (err) {
+      console.error("Failed to load pcm-worklet:", err);
+      toast.error("Votre navigateur ne supporte pas la transcription Soniox. Essayez le mode Web Speech API.");
+      audioContext.close();
+      audioContextRef.current = null;
+      stream.getTracks().forEach((t) => t.stop());
+      mediaStreamRef.current = null;
+      setIsLive(false);
+      isLiveRef.current = false;
+      return;
+    }
+
+    const source = audioContext.createMediaStreamSource(stream);
+    const workletNode = new AudioWorkletNode(audioContext, "pcm-worklet", {
+      processorOptions: { targetSampleRate: 16000 },
+    });
+    workletNodeRef.current = workletNode;
+    source.connect(workletNode);
+
+    const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(`${wsProtocol}//${window.location.host}/api/soniox-stream?share_code=${newCode}`);
+    wsRef.current = ws;
+
+    ws.onmessage = (event) => {
+      let msg: any;
+      try {
+        msg = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+
+      if (msg.type === "ready") {
+        sonioxReadyRef.current = true;
+      } else if (msg.type === "interim") {
+        setInterimText(msg.text);
+      } else if (msg.type === "final") {
+        setInterimText("");
+        setFinalTexts((prev) => [...prev, { id: Date.now(), text: msg.text }]);
+      } else if (msg.type === "error") {
+        const message =
+          msg.message === "stt_connect_failed"
+            ? "Impossible de se connecter au service de transcription Soniox."
+            : "Erreur du service de transcription Soniox.";
+        toast.error(message);
+      }
+    };
+
+    ws.onerror = (event) => {
+      console.error("Soniox WebSocket error:", event);
+    };
+
+    ws.onclose = () => {
+      sonioxReadyRef.current = false;
+    };
+
+    workletNode.port.onmessage = (event) => {
+      if (sonioxReadyRef.current && ws.readyState === WebSocket.OPEN) {
+        ws.send(event.data);
+      }
+    };
+  }
+
+  const toggleLive = async () => {
+    if (isLive) {
+      if (sttMode === "webspeech") {
+        stopWebSpeechRecognition();
+      } else {
+        await stopSonioxStream();
+      }
+      isLiveRef.current = false;
+      setIsLive(false);
+      if (sessionId) {
+        fetch(`/api/sessions/${sessionId}`, { method: "PATCH" }).catch(() => {});
+      }
+      toast.success("Session terminée.");
+      navigate({ to: "/dashboard" });
+      return;
+    }
+
+    let newCode = "";
+    try {
+      const res = await fetch("/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          title: "Session Live", 
+          mode: "live",
+          source_lang: sourceLang,
+          context: context
+        }),
+      });
+      if (!res.ok) throw new Error("Erreur de création de session");
+      const data = await res.json();
+      newCode = data.share_code;
+      setShareCode(newCode);
+      setSessionId(data.id);
+      setIsLive(true);
+      isLiveRef.current = true;
+    } catch (e: any) {
+      toast.error(e.message || "Impossible de démarrer la session.");
+      return;
+    }
+
+    if (sttMode === "webspeech") {
+      startWebSpeechRecognition(newCode);
+    } else {
+      await startSonioxStream(newCode);
+    }
   };
 
   return (
@@ -289,6 +408,34 @@ function TranslatePage() {
                     <option key={l.code} value={l.code}>{l.label}</option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-foreground">Moteur de transcription</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSttMode("soniox")}
+                    className={`rounded-md border px-3 py-2 text-sm transition-colors ${
+                      sttMode === "soniox"
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-background text-muted-foreground hover:bg-accent"
+                    }`}
+                  >
+                    Soniox (recommandé)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSttMode("webspeech")}
+                    className={`rounded-md border px-3 py-2 text-sm transition-colors ${
+                      sttMode === "webspeech"
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-background text-muted-foreground hover:bg-accent"
+                    }`}
+                  >
+                    Web Speech API (fallback)
+                  </button>
+                </div>
               </div>
 
               <div>

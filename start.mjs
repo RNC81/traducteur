@@ -499,6 +499,11 @@ async function attachSonioxWsHandlers(ws, session, share_code, _userId) {
     // doesn't silently lose the trailing segment.
     const utterance = utteranceBuffer.markEndpoint();
     if (utterance && utterance.text) {
+      try {
+        ws.send(JSON.stringify({ type: "final", text: utterance.text }));
+      } catch (err) {
+        console.error("[soniox] failed to send final to speaker (cleanup flush):", err);
+      }
       processFinalTranscript(session, share_code, utterance.text, { draftTranslate: translateFast }).catch((err) => {
         console.error("[soniox] processFinalTranscript error (cleanup flush):", err);
       });
@@ -526,6 +531,11 @@ async function attachSonioxWsHandlers(ws, session, share_code, _userId) {
   sttSession.on("endpoint", () => {
     const utterance = utteranceBuffer.markEndpoint();
     if (utterance && utterance.text) {
+      try {
+        ws.send(JSON.stringify({ type: "final", text: utterance.text }));
+      } catch (err) {
+        console.error("[soniox] failed to send final to speaker:", err);
+      }
       processFinalTranscript(session, share_code, utterance.text, { draftTranslate: translateFast }).catch((err) => {
         console.error("[soniox] processFinalTranscript error:", err);
       });
