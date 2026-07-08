@@ -20,6 +20,7 @@ import { Route as AboutRouteImport } from './routes/about'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as OverlayShareCodeRouteImport } from './routes/overlay.$shareCode'
 import { Route as LiveShareCodeRouteImport } from './routes/live.$shareCode'
+import { Route as DisplayShareCodeRouteImport } from './routes/display.$shareCode'
 
 const TranslateRoute = TranslateRouteImport.update({
   id: '/translate',
@@ -76,6 +77,11 @@ const LiveShareCodeRoute = LiveShareCodeRouteImport.update({
   path: '/live/$shareCode',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DisplayShareCodeRoute = DisplayShareCodeRouteImport.update({
+  id: '/display/$shareCode',
+  path: '/display/$shareCode',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -87,6 +93,7 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/translate': typeof TranslateRoute
+  '/display/$shareCode': typeof DisplayShareCodeRoute
   '/live/$shareCode': typeof LiveShareCodeRoute
   '/overlay/$shareCode': typeof OverlayShareCodeRoute
 }
@@ -100,6 +107,7 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/translate': typeof TranslateRoute
+  '/display/$shareCode': typeof DisplayShareCodeRoute
   '/live/$shareCode': typeof LiveShareCodeRoute
   '/overlay/$shareCode': typeof OverlayShareCodeRoute
 }
@@ -114,6 +122,7 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/terms': typeof TermsRoute
   '/translate': typeof TranslateRoute
+  '/display/$shareCode': typeof DisplayShareCodeRoute
   '/live/$shareCode': typeof LiveShareCodeRoute
   '/overlay/$shareCode': typeof OverlayShareCodeRoute
 }
@@ -129,6 +138,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/terms'
     | '/translate'
+    | '/display/$shareCode'
     | '/live/$shareCode'
     | '/overlay/$shareCode'
   fileRoutesByTo: FileRoutesByTo
@@ -142,6 +152,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/terms'
     | '/translate'
+    | '/display/$shareCode'
     | '/live/$shareCode'
     | '/overlay/$shareCode'
   id:
@@ -155,6 +166,7 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/terms'
     | '/translate'
+    | '/display/$shareCode'
     | '/live/$shareCode'
     | '/overlay/$shareCode'
   fileRoutesById: FileRoutesById
@@ -169,6 +181,7 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   TermsRoute: typeof TermsRoute
   TranslateRoute: typeof TranslateRoute
+  DisplayShareCodeRoute: typeof DisplayShareCodeRoute
   LiveShareCodeRoute: typeof LiveShareCodeRoute
   OverlayShareCodeRoute: typeof OverlayShareCodeRoute
 }
@@ -252,6 +265,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LiveShareCodeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/display/$shareCode': {
+      id: '/display/$shareCode'
+      path: '/display/$shareCode'
+      fullPath: '/display/$shareCode'
+      preLoaderRoute: typeof DisplayShareCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -265,6 +285,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   TermsRoute: TermsRoute,
   TranslateRoute: TranslateRoute,
+  DisplayShareCodeRoute: DisplayShareCodeRoute,
   LiveShareCodeRoute: LiveShareCodeRoute,
   OverlayShareCodeRoute: OverlayShareCodeRoute,
 }
