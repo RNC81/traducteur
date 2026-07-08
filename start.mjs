@@ -169,7 +169,7 @@ async function readBody(req) {
 
 // ─── AI TRANSLATION LOGIC ───────────────────────────────────────────────────
 
-async function translateFast(text, contextStr, targetLangs) {
+async function translateFast(text, targetLangs, contextStr) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return targetLangs.reduce((acc, lang) => ({ ...acc, [lang]: "[Gemini Key missing] " + text }), {});
 
@@ -282,9 +282,6 @@ async function processFinalTranscript(session, share_code, original_text, { draf
   // LAZY TRANSLATION: Only translate to languages actively requested by connected clients
   const clientsMap = sseClients.get(share_code);
   const activeLangs = clientsMap ? Array.from(new Set(clientsMap.values())) : (session.target_langs || []);
-
-  // TODO(debug): remove — temporary diagnostic logging
-  console.log(`[DEBUG] processFinalTranscript share_code=${share_code} activeLangs=${JSON.stringify(activeLangs)} original_text=${JSON.stringify(original_text)}`);
 
   const draftTranslations = await draftTranslate(original_text, activeLangs, session.context);
 
@@ -533,8 +530,6 @@ async function attachSonioxWsHandlers(ws, session, share_code, _userId) {
 
   sttSession.on("endpoint", () => {
     const utterance = utteranceBuffer.markEndpoint();
-    // TODO(debug): remove — temporary diagnostic logging
-    console.log(`[DEBUG] soniox endpoint detected share_code=${share_code} text=${JSON.stringify(utterance?.text || "")}`);
     if (utterance && utterance.text) {
       try {
         ws.send(JSON.stringify({ type: "final", text: utterance.text }));
