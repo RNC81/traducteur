@@ -178,11 +178,8 @@ async function translateFast(text, targetLangs, contextStr) {
   const userMessage = `Texte à traduire : "${text}"`;
   const fullPrompt = prompt + "\n\n" + userMessage;
 
-  // TODO(debug): remove — temporary diagnostic logging
-  console.log(`[DEBUG] translateFast prompt=${JSON.stringify(fullPrompt)}`);
-
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -190,16 +187,11 @@ async function translateFast(text, targetLangs, contextStr) {
       })
     });
     const data = await res.json();
-
-    // TODO(debug): remove — temporary diagnostic logging
-    console.log(`[DEBUG] translateFast raw Gemini response=${JSON.stringify(data)}`);
-
     let jsonResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
     jsonResponse = jsonResponse.replace(/```json/g, "").replace(/```/g, "").trim();
     return JSON.parse(jsonResponse);
   } catch (err) {
-    // TODO(debug): remove — temporary diagnostic logging
-    console.error(`[DEBUG] translateFast error (was silently swallowed before): ${err?.message || err}`, { text, targetLangs, contextStr });
+    console.error(`AI Fast Translation error:`, err);
     return targetLangs.reduce((acc, lang) => ({ ...acc, [lang]: "[Error] " + text }), {});
   }
 }
@@ -294,9 +286,6 @@ async function processFinalTranscript(session, share_code, original_text, { draf
 
   const draftTranslations = await draftTranslate(original_text, activeLangs, session.context);
 
-  // TODO(debug): remove — temporary diagnostic logging
-  console.log(`[DEBUG] draftTranslations share_code=${share_code} result=${JSON.stringify(draftTranslations)}`);
-
   let transcript = await Transcript.create({
     session_id: session._id,
     original_text,
@@ -319,18 +308,12 @@ async function processFinalTranscript(session, share_code, original_text, { draf
       is_final: transcript.is_final,
       timestamp: transcript.timestamp,
     });
-    // TODO(debug): remove — temporary diagnostic logging
-    console.log(`[DEBUG] SSE broadcast (final_draft) share_code=${share_code} msg=${msg}`);
     sessionClients.forEach((_, send) => send(`data: ${msg}\n\n`));
   }
 
   // BACKGROUND VERIFICATION
   if (activeLangs.length > 0) {
-    // TODO(debug): remove — temporary diagnostic logging
-    console.log(`[DEBUG] calling verifyTranslation share_code=${share_code} original_text=${JSON.stringify(original_text)} draft=${JSON.stringify(safeTranslations)} activeLangs=${JSON.stringify(activeLangs)}`);
     verifyTranslation(original_text, safeTranslations, session.context, activeLangs).then(async (rawFinal) => {
-      // TODO(debug): remove — temporary diagnostic logging
-      console.log(`[DEBUG] verifyTranslation returned share_code=${share_code} rawFinal=${JSON.stringify(rawFinal)}`);
       const finalTranslations = { ...safeTranslations };
       for (const [k, v] of Object.entries(rawFinal || {})) {
         if (v && typeof v === "string" && v.trim() !== "") {
@@ -352,8 +335,6 @@ async function processFinalTranscript(session, share_code, original_text, { draf
           is_final: true,
           timestamp: transcript.timestamp,
         });
-        // TODO(debug): remove — temporary diagnostic logging
-        console.log(`[DEBUG] SSE broadcast (final_verified) share_code=${share_code} msg=${finalMsg}`);
         verifiedSessionClients.forEach((_, send) => send(`data: ${finalMsg}\n\n`));
       }
     });
